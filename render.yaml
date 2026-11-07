@@ -31,7 +31,7 @@ services:
       - key: REDIS_URL
         sync: false
       - key: AUTH_SECRET
-        sync: false
+        generateValue: true
       - key: WEB_BASE_URL
         sync: false
       - key: KNOWLEDGE_ADMIN_EMAILS

@@ -1,3 +1,4 @@
+import { InputError } from "./input-repository";
 import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { mockMode } from "./store";
@@ -8,7 +9,11 @@ export const authKey = () => {
     return new TextEncoder().encode(
       "local-demo-only-not-for-production-0123456789",
     );
-  throw new Error("AUTH_SECRET must have at least 32 characters");
+  throw new InputError(
+    "AUTH_NOT_CONFIGURED",
+    "Sign-in is not configured on this server. The site owner must set AUTH_SECRET to at least 32 characters.",
+    503,
+  );
 };
 export function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");

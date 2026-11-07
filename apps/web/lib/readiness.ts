@@ -1,7 +1,12 @@
+import { authKey } from "./auth";
+import { applicationOrigin } from "./application-origin";
+import { InputError } from "./input-repository";
 import { database, mockMode } from "./store";
 export async function readiness() {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    applicationOrigin();
+    authKey();
     if (mockMode())
       return Response.json(
         {
@@ -19,19 +24,25 @@ export async function readiness() {
     ]);
     return Response.json(
       {
-        data: { status: "ready", checks: ["postgresql"] },
+        data: {
+          status: "ready",
+          checks: ["postgresql", "application-origin", "session-signing"],
+        },
         error: null,
         meta: {},
       },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch {
+  } catch (e) {
     return Response.json(
       {
         data: null,
         error: {
-          code: "NOT_READY",
-          message: "Required database connection unavailable.",
+          code: e instanceof InputError ? e.code : "NOT_READY",
+          message:
+            e instanceof InputError
+              ? e.message
+              : "Required database connection unavailable.",
         },
         meta: {},
       },

@@ -1,3 +1,4 @@
+import { applicationOrigin } from "./application-origin";
 import { readiness } from "./readiness";
 import { artifactRoutes } from "./artifact-routes";
 import { randomUUID } from "node:crypto";
@@ -10,11 +11,12 @@ import { maxUploadBytes } from "./image-intake";
 import { z } from "zod";
 import { shootSchema } from "@framecraft/shared";
 import { store, Conflict } from "./store";
-import { hashPassword, verifyPassword, token, identity } from "./auth";
+import { hashPassword, verifyPassword, token, identity, authKey } from "./auth";
 const credentials = z
   .object({
     email: z
       .string()
+      .trim()
       .email()
       .max(254)
       .transform((s) => s.toLowerCase()),
@@ -56,13 +58,13 @@ async function handleRequest(request: Request) {
       return response({ status: "ok" });
     if (!["GET", "HEAD"].includes(request.method)) {
       const origin = request.headers.get("origin");
-      const allowed =
-        process.env.WEB_BASE_URL ??
-        (process.env.NODE_ENV !== "production"
-          ? "http://localhost:3000"
-          : undefined);
+      const allowed = applicationOrigin();
       if (origin !== allowed)
-        return error("ORIGIN_REJECTED", "Refresh the page and try again.", 403);
+        return error(
+          "ORIGIN_REJECTED",
+          "The request origin does not match the server URL. Check WEB_BASE_URL in the server settings.",
+          403,
+        );
       const binaryUpload =
         parts[0] === "shoots" &&
         parts[2] === "uploads" &&
@@ -98,6 +100,8 @@ async function handleRequest(request: Request) {
           "Enter a valid email and password of 12–128 characters.",
           400,
         );
+      // Fail before any account write when the deployment cannot issue sessions.
+      authKey();
       const key = input.data.email;
       if (attempts.size >= 10000) {
         for (const [email, attempt] of attempts)
