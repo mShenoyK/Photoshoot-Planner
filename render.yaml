@@ -4,7 +4,7 @@ services:
   - type: web
     name: framecraft-web
     runtime: node
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm db:generate && pnpm build
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm db:generate && pnpm build
     preDeployCommand: pnpm db:migrate
     startCommand: pnpm start
     healthCheckPath: /api/v1/health
@@ -49,7 +49,7 @@ services:
   - type: worker
     name: framecraft-worker
     runtime: node
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm db:generate
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm db:generate
     startCommand: pnpm worker
     autoDeploy: false
     envVars:

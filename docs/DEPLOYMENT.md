@@ -2,8 +2,10 @@
 
 Source was pushed to GitHub main and verified by remote commit hash (see PHASE_5_REPORT.md). No Render deployment or remote GitHub CI run has been verified. Deployment uses a Next.js web/API service plus a separate BullMQ worker. Current provider/schema support, secret bindings and actual staging smoke checks remain explicit release gates.
 
-Build: pnpm install --frozen-lockfile && pnpm db:generate && pnpm build.
-Predeploy: pnpm db:migrate (requires reviewed DATABASE_URL and database backups).
+Build (repository root): `corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm db:generate && pnpm build`.
+
+The build needs development dependencies, including the Prisma CLI and TypeScript. Explicit `--prod=false` prevents a production install from omitting them.
+Predeploy: `pnpm db:migrate` (requires reviewed DATABASE_URL and database backups).
 Start: pnpm start (Render supplies PORT). Use Node 22+, pnpm 10.28.2, DATA_MODE=postgres, DATABASE_URL, AUTH_SECRET (32+ random characters), WEB_BASE_URL matching the exact HTTPS public origin. Never seed production with demo credentials. Health path /api/v1/health is liveness; add database readiness before deployment automation. Use Render secret settings, never tracked .env.
 
 Before public use: managed identity/Auth.js integration or audit of current auth scaffolding, password recovery/email verification, distributed rate limits, session revocation, backup/restore verification, migrations review, production TLS/cookies, security/monitoring and load tests. Production photo intake now requires STORAGE_DRIVER=s3, private bucket/endpoint/region and least-privilege storage credentials; the local adapter is development-only. Redis/AI credentials remain unnecessary at FC-009. Do not enable paid services as part of this foundation.
@@ -22,3 +24,15 @@ Before public use: managed identity/Auth.js integration or audit of current auth
 8. **Smoke test actual deployment:** set `SMOKE_BASE_URL` to its real HTTPS URL and run `pnpm smoke:deployment`. The script checks landing/liveness, real database readiness and unauthenticated API denial. Then use a dedicated staging test account to create a mixed family, test consent/revocation, upload/delete a synthetic image, generate a plan, create a schematic, export/reopen PDF/MD/CSV/SVG/ZIP, validate hashes, and verify tenant separation and worker retry. Record commit, URLs, timestamp and results before claiming deployed.
 
 HTTP JSON logs emit generated request IDs, method/status/duration and safe job kind/attempt/error codes. They omit request bodies, URLs/query strings, emails, photos, provider prompts, tokens and database strings. `X-Request-ID` links support reports to logs. `/api/v1/health` is liveness; `/api/v1/ready` checks PostgreSQL with a bounded wait (S3 and Redis still need explicit staging probes). Configure a Render log drain/alerts for HTTP 5xx, worker task_failed and readiness failures. Do not expose private metrics or logs publicly. Logs/monitoring delivery is not yet verified.
+
+## Diagnosing a failed Render deploy
+
+Use the first actual error in Render's deploy log, not this documentation's deployment-status paragraphs. Set Root Directory to the repository root (leave it blank), since commands use the pnpm workspace and root Prisma schema path. Enter only shell commands in the Build/Pre-Deploy/Start fields, without Markdown headings or `Build:` prefixes. Existing dashboard-created services may need their settings updated manually; editing render.yaml does not necessarily update them.
+
+- **Build / Prisma CLI not found:** use the explicit `--prod=false` build command above. Prisma and TypeScript are development dependencies needed during compilation and migration.
+- **Prisma engine download failure:** retain TLS verification; inspect the build host's access to binaries.prisma.sh. This cloud sandbox's earlier access failure does not establish a Render failure.
+- **Predeploy / P1001, P1013, P1000 or TLS error:** verify the securely bound DATABASE_URL, same-region/private-host reachability, credentials and provider TLS configuration. Do not reset the database or disable certificate verification.
+- **Startup / missing production build:** verify Build ran from the repository root and succeeded, then start with `pnpm start`; worker uses `pnpm worker`. Next listens on Render's PORT and 0.0.0.0.
+- **Predeploy unsupported by selected plan:** choose a plan supporting the configured predeploy command, or run the reviewed additive migration once from an authorized deployment job before starting web and worker. Never seed/reset production as a workaround.
+
+A root cause is not confirmed until the failing log and service stage are available. After fixing it, verify the deployed commit and run the actual-target smoke script.
