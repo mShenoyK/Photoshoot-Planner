@@ -1,0 +1,85 @@
+# Deployment template: not deployed, linked or smoke-tested on Render.
+# Create PostgreSQL and Redis/Render Key Value first; bind private URLs below.
+services:
+  - type: web
+    name: framecraft-web
+    runtime: node
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm db:generate && pnpm build
+    preDeployCommand: pnpm db:migrate
+    startCommand: pnpm start
+    healthCheckPath: /api/v1/health
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATA_MODE
+        value: postgres
+      - key: STORAGE_DRIVER
+        value: s3
+      - key: QUEUE_DRIVER
+        value: bullmq
+      - key: AI_TEXT_PROVIDER
+        value: mock
+      - key: AI_IMAGE_PROVIDER
+        value: mock
+      - key: AI_EMBEDDINGS_PROVIDER
+        value: mock
+      - key: ENABLE_EMBEDDINGS
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: AUTH_SECRET
+        sync: false
+      - key: WEB_BASE_URL
+        sync: false
+      - key: KNOWLEDGE_ADMIN_EMAILS
+        sync: false
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_REGION
+        sync: false
+      - key: STORAGE_BUCKET
+        sync: false
+      - key: STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: STORAGE_SECRET_ACCESS_KEY
+        sync: false
+  - type: worker
+    name: framecraft-worker
+    runtime: node
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm db:generate
+    startCommand: pnpm worker
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATA_MODE
+        value: postgres
+      - key: STORAGE_DRIVER
+        value: s3
+      - key: QUEUE_DRIVER
+        value: bullmq
+      - key: AI_TEXT_PROVIDER
+        value: mock
+      - key: AI_IMAGE_PROVIDER
+        value: mock
+      - key: AI_EMBEDDINGS_PROVIDER
+        value: mock
+      - key: ENABLE_EMBEDDINGS
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_REGION
+        sync: false
+      - key: STORAGE_BUCKET
+        sync: false
+      - key: STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: STORAGE_SECRET_ACCESS_KEY
+        sync: false

@@ -1,0 +1,8 @@
+{
+  "name": "@framecraft/database",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "@prisma/client": "6.19.0"
+  }
+}

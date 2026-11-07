@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.env*
+!.env.example
+.data/
+private-imports/
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.webp
+test-results/
+playwright-report/
+
+*.tsbuildinfo

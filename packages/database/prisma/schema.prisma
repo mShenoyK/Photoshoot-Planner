@@ -1,0 +1,78 @@
+generator client {
+ provider = "prisma-client-js"
+}
+datasource db {
+ provider = "postgresql"
+ url = env("DATABASE_URL")
+}
+model User {
+ id String @id @default(uuid())
+ email String @unique
+ passwordHash String
+ createdAt DateTime @default(now())
+ shoots Shoot[]
+ cameraKits CameraKit[]
+ knowledge KnowledgeWorkspace?
+ knowledgeIndex KnowledgeSearchIndex[]
+ taskJobs TaskJob[]
+}
+model Shoot {
+ id String @id @default(uuid())
+ workspace ShootWorkspace?
+ taskJobs TaskJob[]
+ ownerId String
+ owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+ name String
+ data Json
+ revision Int @default(1)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ deletedAt DateTime?
+ @@index([ownerId,updatedAt])
+}
+
+// Input aggregate is locked with its Shoot row for consent/intake serialization.
+model ShootWorkspace {
+ shootId String @id
+ shoot Shoot @relation(fields:[shootId],references:[id],onDelete:Cascade)
+ data Json
+ updatedAt DateTime @updatedAt
+}
+model CameraKit {
+ id String @id @default(uuid())
+ ownerId String
+ owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+ name String
+ data Json
+ @@index([ownerId])
+}
+
+model KnowledgeWorkspace {
+ ownerId String @id
+ owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+ data Json
+}
+model KnowledgeSearchIndex {
+ ownerId String
+ owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+ chunkId String
+ documentId String
+ summary String
+ metadata Json
+ vector Json?
+ searchVector Unsupported("tsvector")? @default(dbgenerated())
+ @@id([ownerId,chunkId])
+}
+model TaskJob {
+ id String @id
+ ownerId String
+ owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+ shootId String?
+ shoot Shoot? @relation(fields:[shootId],references:[id],onDelete:Cascade)
+ kind String
+ idempotencyKey String
+ status String
+ data Json
+ @@unique([ownerId,kind,idempotencyKey])
+ @@index([status])
+}
