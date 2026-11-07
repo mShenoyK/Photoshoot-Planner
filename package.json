@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "db:generate": "prisma generate --schema packages/database/prisma/schema.prisma",
-    "db:migrate": "prisma migrate deploy --schema packages/database/prisma/schema.prisma",
+    "db:generate": "PRISMA_GENERATE_SKIP_AUTOINSTALL=true corepack pnpm --filter @framecraft/database db:generate",
+    "db:migrate": "corepack pnpm --filter @framecraft/database db:migrate",
     "db:seed": "tsx packages/database/seed.ts",
     "db:check": "tsx scripts/check-database.ts",
     "worker": "tsx workers/jobs/run.ts",
@@ -48,5 +48,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.0",
     "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.12.0 <23"
   }
 }
