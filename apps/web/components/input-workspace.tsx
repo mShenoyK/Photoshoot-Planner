@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ShootNav } from "./shoot-nav";
+import { ReferencePanel } from "./reference-panel";
 import type { Shoot } from "@framecraft/shared";
 import {
   type Subject,
@@ -54,6 +56,7 @@ export function InputWorkspace({ shootId }: { shootId: string }) {
     );
   return (
     <>
+      <ShootNav shootId={shootId} />
       <Link href={"/shoots/" + shootId} className="hint">
         ← Shoot brief
       </Link>
@@ -200,6 +203,10 @@ export function InputWorkspace({ shootId }: { shootId: string }) {
           subjects={data.subjects}
           media={data.media}
           onChanged={() => void load()}
+        />
+        <ReferencePanel
+          shootId={shootId}
+          refreshKey={data.media.map((m) => m.id).join(",")}
         />
         <section className="banner">
           <div>

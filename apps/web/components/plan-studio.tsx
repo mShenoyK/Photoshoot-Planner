@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { PoseSchematic } from "./pose-schematic";
+import { ShootNav } from "./shoot-nav";
+import { ReferencePanel } from "./reference-panel";
 import type { ShootPlan } from "@framecraft/shared/planning";
 import type { TaskJob } from "@framecraft/shared/knowledge";
 import { api, human } from "./client";
@@ -26,6 +29,10 @@ export function PlanStudio({
     setDraft(data.at(-1) ?? null);
     setDirty(new Set());
   };
+  async function receiveJob(next: TaskJob) {
+    if (next.status === "SUCCEEDED") await load();
+    setJob(next);
+  }
   useEffect(() => {
     load().catch((e) => setError(e.message));
   }, [shootId]);
@@ -75,6 +82,7 @@ export function PlanStudio({
         event.target instanceof Element
           ? event.target.closest("a[href]")
           : null;
+      if (anchor?.getAttribute("href")?.startsWith("#")) return;
       if (anchor && !confirm("Leave this plan without saving your edits?")) {
         event.preventDefault();
         event.stopPropagation();
@@ -124,18 +132,19 @@ export function PlanStudio({
           });
         }}
         onRegenerate={async (value) => {
-          await action(async () =>
-            setJob(
-              await api<TaskJob>(
-                `shoots/${shootId}/plans/${draft.id}/regenerate-section`,
-                "POST",
-                {
-                  baseVersion: draft.version,
-                  section: value,
-                  idempotencyKey: crypto.randomUUID(),
-                },
+          await action(
+            async () =>
+              await receiveJob(
+                await api<TaskJob>(
+                  `shoots/${shootId}/plans/${draft.id}/regenerate-section`,
+                  "POST",
+                  {
+                    baseVersion: draft.version,
+                    section: value,
+                    idempotencyKey: crypto.randomUUID(),
+                  },
+                ),
               ),
-            ),
           );
         }}
       />
@@ -143,7 +152,7 @@ export function PlanStudio({
   }
   async function generate() {
     await action(async () => {
-      setJob(
+      await receiveJob(
         await api<TaskJob>(`shoots/${shootId}/plans`, "POST", {
           poseCount: 6,
           useKnowledgeBase: useKnowledge,
@@ -157,17 +166,15 @@ export function PlanStudio({
       <Link className="hint" href={"/shoots/" + shootId}>
         ← Shoot brief
       </Link>
-      <nav className="actions" aria-label="Planning tools">
-        <Link href={`/shoots/${shootId}/lighting`}>Lighting Lab</Link>
-        <Link href={`/shoots/${shootId}/wardrobe`}>Wardrobe Stylist</Link>
-      </nav>
+      <ShootNav shootId={shootId} />
       <div className="hero">
         <div>
           <p className="eyebrow">Creative direction, with a record</p>
           <h1>{poseStudio ? "Pose Studio." : "A plan you can shape."}</h1>
           <p>
-            Mockable, structured guidance. Every save creates a new version;
-            earlier and approved versions remain intact.
+            Your creative brief, posing guide and shot list in one place.
+            Confirm reference observations, then generate or refine your shoot
+            plan.
           </p>
         </div>
         <Link
@@ -177,6 +184,10 @@ export function PlanStudio({
           {poseStudio ? "Full plan" : "Open Pose Studio"}
         </Link>
       </div>
+      <a className="button secondary" href="#posing-guide">
+        Jump to posing guide
+      </a>
+      <ReferencePanel shootId={shootId} />
       {error && (
         <p role="alert" className="error">
           {error}
@@ -222,12 +233,16 @@ export function PlanStudio({
               retained.
             </p>
           )}
-          {job.status === "FAILED" && (
+          {(job.status === "FAILED" ||
+            (job.status === "QUEUED" &&
+              Date.now() - Date.parse(job.updatedAt) > 60000) ||
+            (job.status === "RUNNING" &&
+              Date.now() - Date.parse(job.updatedAt) > 300000)) && (
             <button
               disabled={busy || job.attempts >= 3}
               onClick={() =>
                 void action(async () => {
-                  setJob(
+                  await receiveJob(
                     await api<TaskJob>(`jobs/${job.id}/retry`, "POST", {}),
                   );
                 })
@@ -415,9 +430,14 @@ export function PlanStudio({
                 ))}
               </section>
             )}
-            <section className="panel">
+            <section className="panel" id="posing-guide">
               {controls("poses")}
-              <h2>Pose cards</h2>
+              <h2>Posing guide</h2>
+              <p>
+                How to arrange, direct and frame every person, with original
+                visual guides and comfort checks.
+              </p>
+              <h3>Pose cards</h3>
               <Link href={`/shoots/${shootId}/files`}>
                 Original illustrations & exports
               </Link>
@@ -433,27 +453,39 @@ export function PlanStudio({
                     .toLowerCase()
                     .includes(query.toLowerCase()),
                 )
-                .map((p) => (
-                  <article className="media-row" key={p.id}>
+                .map((p, poseIndex) => (
+                  <article className="media-row pose-card" key={p.id}>
                     <span className="badge">{human(p.guidanceKind)}</span>
                     <h3>{p.title}</h3>
+                    <PoseSchematic
+                      ids={p.subjectIds}
+                      title={p.title}
+                      index={poseIndex}
+                    />
+                    <h4>How to direct this pose</h4>
+                    <ol>
+                      {p.stepByStepDirections.map((step, i) => (
+                        <li key={i}>{step}</li>
+                      ))}
+                    </ol>
                     <button
                       className="secondary"
                       disabled={busy || jobActive || !!dirty.size}
                       onClick={() =>
-                        void action(async () =>
-                          setJob(
-                            await api<TaskJob>(
-                              `shoots/${shootId}/artifacts`,
-                              "POST",
-                              {
-                                planId: draft.id,
-                                format: "ILLUSTRATION",
-                                poseId: p.id,
-                                idempotencyKey: crypto.randomUUID(),
-                              },
+                        void action(
+                          async () =>
+                            await receiveJob(
+                              await api<TaskJob>(
+                                `shoots/${shootId}/artifacts`,
+                                "POST",
+                                {
+                                  planId: draft.id,
+                                  format: "ILLUSTRATION",
+                                  poseId: p.id,
+                                  idempotencyKey: crypto.randomUUID(),
+                                },
+                              ),
                             ),
-                          ),
                         )
                       }
                     >
@@ -539,8 +571,9 @@ export function PlanStudio({
                       </p>
                     )}
                     <p className="hint">
-                      Original pose illustrations arrive in FC-017. Original
-                      book illustrations are never displayed here.
+                      Generate a private original schematic on demand, or follow
+                      the face-spacing guide above. Original book illustrations
+                      are never displayed here.
                     </p>
                   </article>
                 ))}

@@ -10,7 +10,8 @@
     "./planning": "./src/planning.ts",
     "./styling": "./src/styling.ts",
     "./lighting-svg": "./src/lighting-svg.ts",
-    "./artifacts": "./src/artifacts.ts"
+    "./artifacts": "./src/artifacts.ts",
+    "./references": "./src/references.ts"
   },
   "dependencies": {
     "zod": "^3.25.76"

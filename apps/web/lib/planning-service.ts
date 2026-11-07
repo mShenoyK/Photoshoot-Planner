@@ -1,3 +1,4 @@
+import { approvedReferences } from "./reference-service";
 import { randomUUID } from "node:crypto";
 import {
   planSchema,
@@ -31,7 +32,12 @@ function snapshot(shoot: Shoot, state: InputState) {
   });
   return fingerprint(
     Buffer.from(
-      JSON.stringify({ shoot, subjects, equipment: state.cameraKit ?? null }),
+      JSON.stringify({
+        shoot,
+        subjects,
+        equipment: state.cameraKit ?? null,
+        references: approvedReferences(state),
+      }),
     ),
   );
 }
@@ -166,6 +172,10 @@ async function plannerInput(
         consentHistory: [],
       })) as Subject[],
       equipment: state.cameraKit,
+      referenceInsights: approvedReferences(state).map((r) => ({
+        ...r.analysis,
+        referenceKind: state.media.find((a) => a.id === r.assetId)?.kind,
+      })),
       poseCount,
       inputHash: snapshot(shoot, state),
       genericFallback,

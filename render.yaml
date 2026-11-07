@@ -1,9 +1,11 @@
 # Deployment template: not deployed, linked or smoke-tested on Render.
-# Create PostgreSQL and Redis/Render Key Value first; bind private URLs below.
+# Free web template: bind PostgreSQL and private S3 settings below.
+# Optional paid worker template: render.worker.yaml.
 services:
   - type: web
     name: framecraft-web
     runtime: node
+    plan: free
     buildCommand: corepack pnpm install --frozen-lockfile --prod=false && corepack pnpm db:generate && corepack pnpm --filter @framecraft/web build
     # Free web services have no pre-deploy hook. Apply pending migrations before serving.
     startCommand: corepack pnpm db:migrate && corepack pnpm --filter @framecraft/web start
@@ -17,7 +19,7 @@ services:
       - key: STORAGE_DRIVER
         value: s3
       - key: QUEUE_DRIVER
-        value: bullmq
+        value: inline
       - key: AI_TEXT_PROVIDER
         value: mock
       - key: AI_IMAGE_PROVIDER
@@ -27,52 +29,12 @@ services:
       - key: ENABLE_EMBEDDINGS
         value: "false"
       - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
         sync: false
       - key: AUTH_SECRET
         generateValue: true
       - key: WEB_BASE_URL
         sync: false
       - key: KNOWLEDGE_ADMIN_EMAILS
-        sync: false
-      - key: STORAGE_ENDPOINT
-        sync: false
-      - key: STORAGE_REGION
-        sync: false
-      - key: STORAGE_BUCKET
-        sync: false
-      - key: STORAGE_ACCESS_KEY_ID
-        sync: false
-      - key: STORAGE_SECRET_ACCESS_KEY
-        sync: false
-  # Optional separate worker: requires a supported paid Render plan or an external worker host.
-  - type: worker
-    name: framecraft-worker
-    runtime: node
-    buildCommand: corepack pnpm install --frozen-lockfile --prod=false && corepack pnpm db:generate
-    startCommand: corepack pnpm worker
-    autoDeploy: false
-    envVars:
-      - key: NODE_VERSION
-        value: "22"
-      - key: DATA_MODE
-        value: postgres
-      - key: STORAGE_DRIVER
-        value: s3
-      - key: QUEUE_DRIVER
-        value: bullmq
-      - key: AI_TEXT_PROVIDER
-        value: mock
-      - key: AI_IMAGE_PROVIDER
-        value: mock
-      - key: AI_EMBEDDINGS_PROVIDER
-        value: mock
-      - key: ENABLE_EMBEDDINGS
-        value: "false"
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
         sync: false
       - key: STORAGE_ENDPOINT
         sync: false

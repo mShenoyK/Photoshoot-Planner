@@ -1,3 +1,4 @@
+import { approvedReferences } from "./reference-service";
 import { createHash } from "node:crypto";
 import {
   stylingActionSchema,
@@ -19,6 +20,7 @@ export const stylingInputHash = (state: InputState, shoot: Shoot) =>
           return p;
         }),
         kit: state.cameraKit,
+        references: approvedReferences(state),
       }),
     )
     .digest("hex");

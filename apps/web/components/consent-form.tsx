@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { requiresGuardian, type Subject } from "@framecraft/shared/inputs";
 import { api } from "./client";
 export function ConsentForm({
@@ -15,11 +15,24 @@ export function ConsentForm({
   const [guardianRelationship, setRelation] = useState("");
   const [ack, setAck] = useState(false);
   const [authority, setAuthority] = useState(false);
-  const [analysis, setAnalysis] = useState(false);
-  const [generation, setGeneration] = useState(false);
+  const [analysis, setAnalysis] = useState(
+    subject.consent?.status === "GRANTED" && !!subject.consent.allowAnalysis,
+  );
+  const [generation, setGeneration] = useState(
+    subject.consent?.status === "GRANTED" && !!subject.consent.allowGeneration,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const guardian = requiresGuardian(subject);
+  useEffect(() => {
+    setAnalysis(
+      subject.consent?.status === "GRANTED" && !!subject.consent.allowAnalysis,
+    );
+    setGeneration(
+      subject.consent?.status === "GRANTED" &&
+        !!subject.consent.allowGeneration,
+    );
+  }, [subject.consent?.id]);
   async function submit(status: "GRANTED" | "REFUSED" | "REVOKED") {
     setBusy(true);
     setError("");
@@ -52,7 +65,10 @@ export function ConsentForm({
         <p>
           Photo intake includes private storage, image quality checks, removal
           of metadata from download copies, and owner-only viewing/download.
-          Photos are optional. This milestone sends no images to AI providers.
+          Photos are optional. Analysis runs only when requested after
+          permission is granted. With OpenAI configured, a private
+          metadata-stripped copy is sent to OpenAI; local mock mode does not
+          inspect the image.
         </p>
         <p>
           Originals and download copies are kept until consent is
@@ -118,7 +134,7 @@ export function ConsentForm({
           checked={analysis}
           onChange={(e) => setAnalysis(e.target.checked)}
         />{" "}
-        Separately permit future AI visual analysis (not run in this milestone).
+        Permit photo analysis for posing, lighting and wardrobe observations.
       </label>
       <label className="check">
         <input
@@ -126,8 +142,7 @@ export function ConsentForm({
           checked={generation}
           onChange={(e) => setGeneration(e.target.checked)}
         />{" "}
-        Separately permit future personalized generation (not run in this
-        milestone).
+        Permit future personalized image generation (currently unavailable).
       </label>
       {error && (
         <p role="alert" className="error">

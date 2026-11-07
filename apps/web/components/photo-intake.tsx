@@ -82,13 +82,18 @@ export function PhotoIntake({
     }
   }
   return (
-    <section className="panel">
+    <section className="panel" id="photo-intake">
       <p className="eyebrow">Optional references</p>
       <h2>Private photo intake</h2>
       <p className="muted">
         Use neutral lighting, minimal filtering and a full-length view when
         practical. Check focus and perspective yourself; automated checks cannot
         reliably judge blur, occlusion or color casts.
+      </p>
+      <p className="quality-note">
+        For photo-led styling and planning, enable photo-analysis permission in
+        each person’s consent before uploading. Changing consent removes linked
+        photos; you may need to upload them again.
       </p>
       <div className="field">
         <label htmlFor="photo-kind">Reference type</label>

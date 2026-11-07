@@ -61,8 +61,10 @@ export class S3ObjectStore implements ObjectStore {
     region: string,
   ) {
     if (!bucket || !endpoint.startsWith("https://") || !region)
-      throw new Error(
-        "Configure a private S3 bucket, HTTPS endpoint and region",
+      throw new InputError(
+        "STORAGE_NOT_CONFIGURED",
+        "Configure a private S3 bucket, HTTPS endpoint and region before uploading references.",
+        503,
       );
     this.client = new S3Client({
       endpoint,
@@ -117,7 +119,11 @@ export function objectStore(): ObjectStore {
     !process.env.STORAGE_ACCESS_KEY_ID ||
     !process.env.STORAGE_SECRET_ACCESS_KEY
   )
-    throw new Error("Private storage credentials are not configured");
+    throw new InputError(
+      "STORAGE_NOT_CONFIGURED",
+      "Private image storage is not configured. Set the S3-compatible storage credentials on the server before uploading references.",
+      503,
+    );
   return new S3ObjectStore(
     process.env.STORAGE_BUCKET ?? "",
     process.env.STORAGE_ENDPOINT ?? "",

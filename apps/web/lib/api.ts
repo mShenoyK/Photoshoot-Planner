@@ -1,3 +1,4 @@
+import { referenceRoutes } from "./reference-routes";
 import { applicationOrigin } from "./application-origin";
 import { readiness } from "./readiness";
 import { artifactRoutes } from "./artifact-routes";
@@ -139,6 +140,8 @@ async function handleRequest(request: Request) {
     }
     const owner = await identity(request);
     if (!owner) return error("UNAUTHORIZED", "Sign in to continue.", 401);
+    const references = await referenceRoutes(request, parts, owner, {ok:response,readJson});
+    if(references) return references;
     const artifacts = await artifactRoutes(request, parts, owner, {
       ok: response,
       readJson,

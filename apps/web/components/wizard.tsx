@@ -263,7 +263,9 @@ export function Wizard({ id }: { id?: string }) {
           >
             Plan & Pose Studio
           </Link>
-          <Link href={`/shoots/${record.current.id}/files`}>Files & exports</Link>
+          <Link href={`/shoots/${record.current.id}/files`}>
+            Files & exports
+          </Link>
           <Link href={`/shoots/${record.current.id}/lighting`}>
             Lighting Lab
           </Link>
@@ -444,8 +446,9 @@ export function Wizard({ id }: { id?: string }) {
                 )}
                 <div className="banner">
                   <p>
-                    No photos needed. Detailed subject profiles and consent
-                    controls will be added in the next milestone.
+                    After saving, add detailed subject profiles and consented
+                    reference images under People, photos & equipment. Manual
+                    planning also works without photos.
                   </p>
                 </div>
               </>
@@ -565,8 +568,9 @@ export function Wizard({ id }: { id?: string }) {
                   </dd>
                 </dl>
                 <p className="hint">
-                  This milestone saves your brief. Structured plan generation
-                  will arrive with FC-013; no AI requests are sent.
+                  Your brief is saved. Open Plan & Pose Studio to generate your
+                  posing guide and shot list, then refine lighting and wardrobe
+                  using reviewed reference images.
                 </p>
               </>
             )}

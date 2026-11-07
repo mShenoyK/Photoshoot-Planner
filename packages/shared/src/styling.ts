@@ -108,6 +108,8 @@ export const outfitSchema = z
 export const lookSchema = z
   .object({
     subjectId: z.string().uuid(),
+    sourceReferenceId: z.string().uuid().optional(),
+    sourceAssetId: z.string().uuid().optional(),
     label: z.string().max(100),
     candidates: z.array(outfitSchema).length(3),
     selectedId: z.string(),

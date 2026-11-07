@@ -19,18 +19,27 @@ import { InputError, withShoot } from "./input-repository";
 import { mockMode } from "./store";
 export const QUEUE_NAME = "framecraft-tasks";
 export function queueMode() {
-  const mode = process.env.QUEUE_DRIVER ?? (mockMode() ? "mock" : "bullmq");
+  const mode = process.env.QUEUE_DRIVER ?? (mockMode() ? "mock" : "inline");
   if (mode === "mock" && !mockMode())
     throw new InputError(
       "QUEUE_CONFIG",
       "In-process queue is restricted to local mock mode.",
       503,
     );
-  if (!["mock", "bullmq"].includes(mode))
+  if (!["mock", "bullmq", "inline"].includes(mode))
     throw new InputError("QUEUE_CONFIG", "Unknown queue driver.", 503);
   return mode;
 }
 export async function dispatch(job: TaskJob) {
+  if (queueMode() === "inline") {
+    try {
+      await runTask(job.ownerId, job.id);
+    } catch (e) {
+      const recorded = await getJob(job.ownerId, job.id);
+      if (recorded.status !== "FAILED") throw e;
+    }
+    return;
+  }
   if (queueMode() === "mock") {
     if (process.env.MOCK_QUEUE_AUTO_RUN !== "false")
       setTimeout(() => {
@@ -137,7 +146,7 @@ export async function enqueue(
       });
       return getJob(owner, result.job.id);
     }
-  return result.job;
+  return queueMode() === "inline" ? getJob(owner, result.job.id) : result.job;
 }
 export async function runTask(owner: string, id: string) {
   const claimed = await withJobs(owner, (jobs) => {
@@ -266,7 +275,12 @@ export async function runTask(owner: string, id: string) {
 }
 export async function retryTask(owner: string, id: string) {
   const job = await getJob(owner, id);
-  if (job.status !== "FAILED" || job.attempts >= 3)
+  const abandoned =
+    queueMode() === "inline" &&
+    ((job.status === "QUEUED" &&
+      Date.now() - Date.parse(job.updatedAt) > 60000) ||
+      (job.status === "RUNNING" && (job.leaseUntil ?? 0) < Date.now()));
+  if ((!abandoned && job.status !== "FAILED") || job.attempts >= 3)
     throw new InputError(
       "RETRY_UNAVAILABLE",
       "Only failed jobs with attempts remaining can be retried.",

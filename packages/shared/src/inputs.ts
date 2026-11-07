@@ -172,6 +172,7 @@ export const canonPreset: z.infer<typeof equipmentSchema> = {
     "Starting equipment inventory only. Exposure and light placement depend on the actual scene.",
 };
 export type InputState = {
+  referenceReviews?: import("./references").ReferenceReview[];
   artifacts?: import("./artifacts").Artifact[];
   styling?: import("./styling").Styling[];
   plans?: import("./planning").ShootPlan[];

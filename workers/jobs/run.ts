@@ -7,7 +7,7 @@ import {
   queueMode,
 } from "../../apps/web/lib/job-queue";
 async function main() {
-  if (queueMode() === "mock") {
+  if (["mock", "inline"].includes(queueMode())) {
     await drainLocalQueue();
     if (process.argv.includes("--once")) return;
     const timer = setInterval(() => void drainLocalQueue(), 1000);

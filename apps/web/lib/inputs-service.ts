@@ -78,6 +78,7 @@ async function discard(state: InputState, subjectId?: string) {
     if (matches(intent.subjectIds)) intent.status = "INVALID";
   const removed = state.media.filter((a) => matches(a.subjectIds));
   state.media = state.media.filter((a) => !matches(a.subjectIds));
+  state.referenceReviews = (state.referenceReviews ?? []).filter(r => !removed.some(a=>a.id===r.assetId));
   state.pendingDeletionKeys = [
     ...new Set([
       ...(state.pendingDeletionKeys ?? []),

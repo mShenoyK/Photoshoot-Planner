@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { ShootNav } from "./shoot-nav";
+import { ReferencePanel } from "./reference-panel";
 import type {
   Styling,
   StylingAction,
@@ -40,6 +41,12 @@ export function StylingStudio({
         if (active) {
           setData(v);
           setHero(v.latest?.wardrobe?.heroSubjectId ?? "");
+          if (v.latest?.lighting) {
+            setRecipe(v.latest.lighting.recipe);
+            setFill(
+              v.latest.lighting.scene.lights.some((l) => l.purpose === "FILL"),
+            );
+          }
         }
       })
       .catch((e) => {
@@ -106,20 +113,22 @@ export function StylingStudio({
     }
   };
   return (
-    <main className="container">
-      <nav className="actions" aria-label="Shoot tools">
-        <Link href={`/shoots/${shootId}`}>Shoot brief</Link>
-        <Link href={`/shoots/${shootId}/subjects`}>People & equipment</Link>
-        <Link href={`/shoots/${shootId}/plan`}>Plan</Link>
-        <Link href={`/shoots/${shootId}/lighting`}>Lighting Lab</Link>
-        <Link href={`/shoots/${shootId}/wardrobe`}>Wardrobe Stylist</Link>
-      </nav>
+    <section className="container">
+      <ShootNav shootId={shootId} />
       <h1>{mode === "lighting" ? "Lighting Lab" : "Wardrobe Stylist"}</h1>
       <p>
         {mode === "lighting"
           ? "Original schematics and unmetered starting settings. Verify on location."
-          : "Three original looks per person, using manual preferences. Photos are optional; no photo analysis or personality inference."}
+          : "Three considered looks per person. Review your photo’s visible proportions and colors, or start with personal preferences. You make the final choice."}
       </p>
+      <ReferencePanel
+        shootId={shootId}
+        onApproved={() => {
+          api<View>(`shoots/${shootId}/styling`)
+            .then(setData)
+            .catch((e) => setError(e.message));
+        }}
+      />
       {error && (
         <div role="alert">
           {error}{" "}
@@ -206,6 +215,75 @@ export function StylingStudio({
                 {lighting && (
                   <>
                     <h2>{lighting.title}</h2>
+                    <fieldset key={current?.revision}>
+                      <legend>Adjust your setup</legend>
+                      <div className="row">
+                        {(
+                          [
+                            ["camera", "heightM", "Camera height (m)"],
+                            ["key", "x", "Key horizontal position (m)"],
+                            ["key", "y", "Key depth position (m)"],
+                            ["key", "heightM", "Key height (m)"],
+                          ] as const
+                        ).map(([target, field, label]) => (
+                          <label key={label}>
+                            {label}
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max={field === "heightM" ? 4 : 12}
+                              defaultValue={
+                                target === "camera"
+                                  ? lighting.scene.camera[field]
+                                  : lighting.scene.lights[0][field]
+                              }
+                              onChange={(e) => {
+                                try {
+                                  const scene = dirty
+                                    ? JSON.parse(sceneText)
+                                    : structuredClone(lighting.scene);
+                                  if (target === "camera")
+                                    scene.camera[field] = Number(
+                                      e.target.value,
+                                    );
+                                  else
+                                    scene.lights[0][field] = Number(
+                                      e.target.value,
+                                    );
+                                  setSceneText(JSON.stringify(scene, null, 2));
+                                  setDirty(true);
+                                } catch {
+                                  setError(
+                                    "Correct or discard the JSON edits before adjusting the setup.",
+                                  );
+                                }
+                              }}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <button
+                        disabled={!dirty}
+                        onClick={() => {
+                          try {
+                            void act({
+                              action: "SCENE",
+                              scene: JSON.parse(sceneText),
+                            });
+                          } catch {
+                            setError("Check your setup values.");
+                          }
+                        }}
+                      >
+                        Update lighting diagram
+                      </button>
+                      <p className="hint">
+                        Save to redraw both views. Positions and heights are
+                        starting assumptions, not measurements inferred from
+                        your photo.
+                      </p>
+                    </fieldset>
                     <div className="styling-diagrams">
                       {(["top", "side"] as const).map((view) => (
                         <figure key={view}>
@@ -326,7 +404,32 @@ export function StylingStudio({
                 {wardrobe && (
                   <>
                     <h2>Coordinated palette</h2>
-                    <p>{wardrobe.palette.join(" · ")}</p>
+                    <div
+                      className="palette-strip"
+                      aria-label="Coordinated wardrobe colors"
+                    >
+                      {wardrobe.palette.map((c) => (
+                        <span key={c}>
+                          <span
+                            className="palette-dot"
+                            style={{
+                              backgroundColor: /^#[0-9a-f]{6}$/i.test(c)
+                                ? c
+                                : ((
+                                    {
+                                      cream: "#e8deca",
+                                      navy: "#26374a",
+                                      terracotta: "#aa6f51",
+                                      slate: "#63717d",
+                                      "muted blue": "#809cb3",
+                                    } as Record<string, string>
+                                  )[c] ?? "#c1c5cb"),
+                            }}
+                          />
+                          {c}
+                        </span>
+                      ))}
+                    </div>
                     <p>{wardrobe.rationale}</p>
                     {wardrobe.looks.map((look) => (
                       <section
@@ -415,7 +518,7 @@ export function StylingStudio({
           {busy && <p role="status">Saving a new version…</p>}
         </>
       )}
-    </main>
+    </section>
   );
 }
 function ObservationEditor({

@@ -1,3 +1,5 @@
+import { approvedReferences, analysisPermission } from "./reference-service";
+import type { ReferenceAnalysis } from "@framecraft/shared/references";
 import type { Shoot } from "@framecraft/shared";
 import type { InputState, Subject } from "@framecraft/shared/inputs";
 import {
@@ -86,6 +88,16 @@ export function lightingRules(
     ],
     backdrop: { kind: stacked ? "BLACK" : "SCENE", y: 0.6 },
   };
+  const photo = approvedReferences(state).at(-1)?.analysis;
+  if (!stacked && photo?.keySide === "RIGHT") {
+    scene.lights[0].x = 4.5;
+    scene.lights[0].directionDeg = 215;
+  }
+  if (!stacked && photo?.keySide === "FRONT") {
+    scene.lights[0].x = 3;
+    scene.lights[0].y = 3.3;
+    scene.lights[0].directionDeg = 270;
+  }
   if (fill && flash && kit!.flashCount > 1)
     scene.lights.push({
       id: "fill",
@@ -100,6 +112,11 @@ export function lightingRules(
       directionDeg: stacked ? 261 : 225,
     });
   const notes = [
+    ...(photo
+      ? [
+          `Reviewed reference: ${photo.lightingNotes}. Image-based reconstruction is uncertain; verify with test exposures.`,
+        ]
+      : []),
     ...(!state.subjects.length
       ? [
           "Generic subject markers: profiles are not confirmed. Add manual profiles for age-aware planning; no photos are required.",
@@ -172,19 +189,62 @@ const tokens = (s: string) =>
     .split(/[,;\n]/)
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
+function isAvoided(color: string, avoid: string[]): boolean {
+  const terms = [color.toLowerCase()];
+  if (/^#[0-9a-f]{6}$/i.test(color)) {
+    const r = parseInt(color.slice(1, 3), 16),
+      g = parseInt(color.slice(3, 5), 16),
+      b = parseInt(color.slice(5, 7), 16);
+    const max = Math.max(r, g, b),
+      min = Math.min(r, g, b),
+      delta = max - min;
+    if (max < 60) terms.push("black", "dark");
+    if (delta < 35)
+      terms.push(max > 225 ? "white" : max > 150 ? "gray" : "slate", "neutral");
+    else if (delta < 60 && min > 150) terms.push("beige", "cream");
+    else {
+      let hue =
+        max === r
+          ? 60 * ((g - b) / delta)
+          : max === g
+            ? 60 * ((b - r) / delta + 2)
+            : 60 * ((r - g) / delta + 4);
+      hue = (hue + 360) % 360;
+      terms.push(
+        hue < 15 || hue >= 345
+          ? "red"
+          : hue < 42
+            ? "orange"
+            : hue < 70
+              ? "yellow"
+              : hue < 170
+                ? "green"
+                : hue < 265
+                  ? "blue"
+                  : hue < 320
+                    ? "purple"
+                    : "pink",
+      );
+      if (max < 150 && b === max) terms.push("navy");
+      if (r === max && max < 200) terms.push("brown", "terracotta");
+    }
+  }
+  return avoid.some((a) => terms.some((c) => c.includes(a) || a.includes(c)));
+}
 function candidates(
   p: Subject,
   colors: string[],
   shoot: Shoot,
   observation: Wardrobe["observations"][number] | undefined,
+  photo?: ReferenceAnalysis,
 ): Wardrobe["looks"][number]["candidates"] {
   const avoid = tokens(p.avoidedColors);
   const preferred = tokens(p.preferredColors).filter(
-    (c) => !avoid.some((a) => c.includes(a) || a.includes(c)),
+    (c) => !isAvoided(c, avoid),
   );
-  const safe = [...new Set([...preferred, ...colors])].filter(
-    (c) => !avoid.some((a) => c.includes(a) || a.includes(c)),
-  );
+  const safe = [
+    ...new Set([...preferred, ...(photo?.suggestedColors ?? []), ...colors]),
+  ].filter((c) => !isAvoided(c, avoid));
   if (!safe.length)
     throw new InputError(
       "PALETTE_CONFLICT",
@@ -193,7 +253,7 @@ function candidates(
   return ["Relaxed layers", "Occasion separates", "Textured tonal look"].map(
     (name, i) => ({
       id: `${p.id}-${i}`,
-      name,
+      name: photo?.outfits[i]?.name || name,
       color: safe[i % safe.length],
       garments: [
         i === 0
@@ -201,18 +261,30 @@ function candidates(
           : i === 1
             ? "Occasion-appropriate shirt, tunic or top with preferred bottoms"
             : "Matte textured layer over a comfortable base",
+        ...(photo?.outfits[i]?.garments ?? []),
         `Color direction: ${safe[i % safe.length]}; choose your own silhouette`,
       ],
       accessories: [
         "Optional simple accessory; omit snagging items for children",
         "Stable footwear suited to terrain and mobility",
       ],
-      rationale: `Coordinates color weight without identical outfits. Use solid or broad, low-density patterns so faces remain readable. ${preferred.length ? "Stated color preferences take priority." : "Palette is a suggestion; no appearance or personality was inferred."}`,
+      rationale: `${photo ? `Reviewed photo guidance: ${photo.outfits[i]?.rationale}. ` : ""}Coordinates color weight without identical outfits. Use solid or broad, low-density patterns so faces remain readable. ${preferred.length ? "Stated color preferences take priority." : "Palette is a suggestion; no appearance or personality was inferred."}`,
       suitability: `${shoot.settings.sceneCategory}: ${shoot.settings.sceneDetails || "verify backdrop contrast on location"}. ${shoot.settings.lightMode === "NATURAL" ? "Breathable layers for shade; check wind, heat and weather." : "Matte fabric reduces flash glare; check sheen and white clipping under the actual light."} Occasion: ${shoot.settings.occasion || "confirm formality"}. ${observation?.visibleColors ? `Reported garment colors: ${observation.visibleColors}; uncertain, verify under neutral light before using. ${observation.uncertainty}` : ""}`,
-      comfort: `Confirm size ${p.clothingSize || "with participant"}; never infer measurements. ${p.fitComfort || "Allow free movement and seated comfort."} ${p.mobilityNotes || "Ask about footwear, sensory needs and accessible changing space."} ${observation?.fitNotes ? `User fit note: ${observation.fitNotes}` : ""}`,
+      comfort: `${photo ? `Editable visual proportion impression: ${photo.visibleProportions.slice(0, 800)}. ${photo.fitSuggestions.join(" ").slice(0, 1200)} These are not measurements. ` : ""}Confirm size ${p.clothingSize || "with participant"}; never infer measurements. ${p.fitComfort || "Allow free movement and seated comfort."} ${p.mobilityNotes || "Ask about footwear, sensory needs and accessible changing space."} ${observation?.fitNotes ? `User fit note: ${observation.fitNotes}` : ""}`,
       alternatives: `${p.stylePreferences ? `Respect stated preferences: ${p.stylePreferences}. ` : "Confirm cultural coverage and personal preferences. "}Use existing clothes or low-cost separates${p.budget !== undefined ? ` within the stated ${p.currency} ${p.budget} budget (no live prices checked)` : "; confirm budget"}. Add/remove layers for weather. ${observation?.fabricNotes ? `Review user fabric note: ${observation.fabricNotes}` : ""}`,
     }),
   );
+}
+function photoLookAllowed(look: Wardrobe["looks"][number], state: InputState) {
+  if (!look.sourceReferenceId && !look.sourceAssetId) return true;
+  const asset = state.media.find((a) => a.id === look.sourceAssetId);
+  if (!asset) return false;
+  try {
+    analysisPermission(state, asset);
+    return true;
+  } catch {
+    return false;
+  }
 }
 export function wardrobeRules(
   shoot: Shoot,
@@ -240,19 +312,20 @@ export function wardrobeRules(
     );
   const retained =
     old?.looks.filter(
-      (l) => l.locked && subjects.some((p) => p.id === l.subjectId),
+      (l) =>
+        l.locked &&
+        subjects.some((p) => p.id === l.subjectId) &&
+        photoLookAllowed(l, state),
     ) ?? [];
-  const heroLook = old?.looks.find((l) => l.subjectId === hero);
+  const heroLook = old?.looks.find(
+    (l) => l.subjectId === hero && photoLookAllowed(l, state),
+  );
   if (heroLook && !retained.some((l) => l.subjectId === heroLook.subjectId))
     retained.push(heroLook);
   for (const l of retained) {
     const p = subjects.find((p) => p.id === l.subjectId)!;
     const color = l.candidates.find((c) => c.id === l.selectedId)!.color;
-    if (
-      tokens(p.avoidedColors).some(
-        (a) => color.includes(a) || a.includes(color),
-      )
-    )
+    if (isAvoided(color, tokens(p.avoidedColors)))
       throw new InputError(
         "LOCK_CONFLICT",
         `Unlock ${p.label || "subject"} or clear the hero before rebalancing: its selected color conflicts with current avoided colors.`,
@@ -268,6 +341,7 @@ export function wardrobeRules(
     ...new Set([
       ...anchorColors,
       ...tokens(heroPreference),
+      ...approvedReferences(state).flatMap((r) => r.analysis.suggestedColors),
       ...(shoot.settings.sceneCategory === "GARDEN" ||
       shoot.settings.sceneCategory === "FOREST"
         ? ["cream", "terracotta", "navy"]
@@ -286,6 +360,26 @@ export function wardrobeRules(
       (p, index) =>
         retained.find((l) => l.subjectId === p.id) ?? {
           subjectId: p.id,
+          sourceReferenceId: approvedReferences(state)
+            .slice()
+            .reverse()
+            .find(
+              (r) =>
+                r.subjectIds.length === 1 &&
+                r.subjectIds[0] === p.id &&
+                state.media.find((a) => a.id === r.assetId)?.kind ===
+                  "SUBJECT_PHOTO",
+            )?.id,
+          sourceAssetId: approvedReferences(state)
+            .slice()
+            .reverse()
+            .find(
+              (r) =>
+                r.subjectIds.length === 1 &&
+                r.subjectIds[0] === p.id &&
+                state.media.find((a) => a.id === r.assetId)?.kind ===
+                  "SUBJECT_PHOTO",
+            )?.assetId,
           label: p.label || "Subject",
           candidates: candidates(
             p,
@@ -295,6 +389,16 @@ export function wardrobeRules(
             ],
             shoot,
             observations.find((o) => o.subjectId === p.id),
+            approvedReferences(state)
+              .slice()
+              .reverse()
+              .find(
+                (r) =>
+                  r.subjectIds.length === 1 &&
+                  r.subjectIds[0] === p.id &&
+                  state.media.find((a) => a.id === r.assetId)?.kind ===
+                    "SUBJECT_PHOTO",
+              )?.analysis,
           ),
           selectedId: `${p.id}-0`,
           locked: false,

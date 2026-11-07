@@ -25,7 +25,7 @@ export function Dashboard() {
       <div className="eyebrow">The photographer’s workspace</div>
       <div className="hero">
         <div>
-          <h1>Good shoots start here.</h1>
+          <h1>Your vision. Beautifully planned.</h1>
           <p>
             Bring a little intention to your next session. Shape the brief, find
             your light, and make room for the unexpected.
@@ -42,8 +42,8 @@ export function Dashboard() {
         <div>
           <h3>From first idea to shoot day.</h3>
           <p>
-            Start with a brief. No reference photographs required. Planning,
-            lighting, and wardrobe tools arrive in upcoming milestones.
+            Bring your reference images. Shape the poses, find the light and
+            coordinate every look, all in one private workspace.
           </p>
         </div>
       </div>

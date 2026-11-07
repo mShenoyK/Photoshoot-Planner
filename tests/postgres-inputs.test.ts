@@ -1,3 +1,4 @@
+import { enqueue } from "../apps/web/lib/job-queue";
 import {
   createArtifact,
   downloadArtifact,
@@ -293,6 +294,24 @@ suite(
       await expect(downloadArtifact(other, shoot, id)).rejects.toMatchObject({
         code: "NOT_FOUND",
       });
+    });
+    it("executes durable SQL-backed plans inline without a Redis worker", async () => {
+      const prior = process.env.QUEUE_DRIVER;
+      process.env.QUEUE_DRIVER = "inline";
+      try {
+        const job = await enqueue(
+          owner,
+          "PLAN",
+          randomUUID(),
+          { poseCount: 2, useKnowledgeBase: false },
+          shoot,
+        );
+        expect(job.status).toBe("SUCCEEDED");
+        expect(job.result?.planId).toBeTruthy();
+      } finally {
+        if (prior === undefined) delete process.env.QUEUE_DRIVER;
+        else process.env.QUEUE_DRIVER = prior;
+      }
     });
   },
 );

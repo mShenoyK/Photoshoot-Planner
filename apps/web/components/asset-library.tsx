@@ -31,6 +31,12 @@ export function AssetLibrary({ shootId }: { shootId: string }) {
     setArtifacts(a);
     return p;
   };
+  async function receiveJob(next: TaskJob) {
+    if (next.status === "SUCCEEDED") await load();
+    if (next.status === "FAILED")
+      setError(`Task failed: ${next.errorCode}. Saved artifacts are retained.`);
+    setJob(next);
+  }
   useEffect(() => {
     load()
       .then((p) => {
@@ -51,6 +57,10 @@ export function AssetLibrary({ shootId }: { shootId: string }) {
         .then(async (next) => {
           if (!mounted) return;
           if (next.status === "SUCCEEDED") await load();
+          if (next.status === "FAILED")
+            setError(
+              `Task failed: ${next.errorCode}. Saved artifacts are retained.`,
+            );
           setJob(next);
           if (next.status === "FAILED")
             setError(
@@ -73,7 +83,7 @@ export function AssetLibrary({ shootId }: { shootId: string }) {
     setError("");
     setBusy(true);
     try {
-      setJob(
+      await receiveJob(
         await api<TaskJob>(`shoots/${shootId}/artifacts`, "POST", {
           planId,
           format: illustration ? "ILLUSTRATION" : format,
@@ -92,7 +102,7 @@ export function AssetLibrary({ shootId }: { shootId: string }) {
     }
   };
   return (
-    <main className="container">
+    <section className="container">
       <nav className="actions">
         <Link href={`/shoots/${shootId}`}>Shoot brief</Link>
         <Link href={`/shoots/${shootId}/plan`}>Pose plan</Link>
@@ -250,6 +260,6 @@ export function AssetLibrary({ shootId }: { shootId: string }) {
           ))}
         </div>
       )}
-    </main>
+    </section>
   );
 }

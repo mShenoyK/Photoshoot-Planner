@@ -30,7 +30,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <main id="main">{children}</main>
         <footer>
           Made for the moments worth planning.{" "}
-          <span>FrameCraft AI · Foundation preview</span>
+          <span>FrameCraft AI · Create with intention</span>
         </footer>
       </body>
     </html>
