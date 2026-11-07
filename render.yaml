@@ -5,8 +5,8 @@ services:
     name: framecraft-web
     runtime: node
     buildCommand: corepack pnpm install --frozen-lockfile --prod=false && corepack pnpm db:generate && corepack pnpm --filter @framecraft/web build
-    preDeployCommand: corepack pnpm db:migrate
-    startCommand: corepack pnpm --filter @framecraft/web start
+    # Free web services have no pre-deploy hook. Apply pending migrations before serving.
+    startCommand: corepack pnpm db:migrate && corepack pnpm --filter @framecraft/web start
     healthCheckPath: /api/v1/health
     autoDeploy: false
     envVars:
@@ -46,6 +46,7 @@ services:
         sync: false
       - key: STORAGE_SECRET_ACCESS_KEY
         sync: false
+  # Optional separate worker: requires a supported paid Render plan or an external worker host.
   - type: worker
     name: framecraft-worker
     runtime: node
