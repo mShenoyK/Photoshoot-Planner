@@ -89,7 +89,8 @@ See PHASE_4_REPORT.md. Stop at FC-016; FC-017–019 are next (original illustrat
 - [x] FC-020 GitHub Actions and separate Render web/worker templates, readiness and actual-target smoke command
 - [x] FC-021 cross-owner/cross-shoot access, unsafe/malformed provider output, CSV injection, export integrity, log redaction and cleanup-failure checks
 - [x] FC-022 automated responsive export/schematic checks at 375/768/1280/1440 px; controlled pilot rubric
-- [ ] Successful GitHub push and remote Actions run (requires working repository authentication)
+- [x] Successful GitHub push to main, verified remote source commit c7c91b8
+- [ ] Remote GitHub Actions run verified (CLI authentication remains unavailable)
 - [ ] Actual Render release plus database/storage/Redis smoke tests and external connectivity
 - [ ] Real editorial/personalized image provider, semantic fidelity and complete Unicode font coverage
 - [ ] Photographer/stylist pilot, independent accessibility/security review and remaining auth hardening

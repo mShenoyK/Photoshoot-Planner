@@ -1,6 +1,6 @@
 # Deployment preparation
 
-No Render deployment, GitHub CI run or GitHub source push has been tested. Phase 1 uses one Next.js service for web/API. FC-020 adds worker/API separation as required and validates current provider schema, pgvector support, secret bindings and a real staging flow.
+Source was pushed to GitHub main and verified by remote commit hash (see PHASE_5_REPORT.md). No Render deployment or remote GitHub CI run has been verified. Deployment uses a Next.js web/API service plus a separate BullMQ worker. Current provider/schema support, secret bindings and actual staging smoke checks remain explicit release gates.
 
 Build: pnpm install --frozen-lockfile && pnpm db:generate && pnpm build.
 Predeploy: pnpm db:migrate (requires reviewed DATABASE_URL and database backups).

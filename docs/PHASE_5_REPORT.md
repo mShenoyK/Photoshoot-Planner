@@ -27,7 +27,7 @@ The app now has on-demand original schematic illustrations, immutable private ou
 | FC-017 | On-demand original validated SVG fallback, private preview and retry             | Real editorial provider/credentials and semantic/pose-fidelity evaluation; no photographic simulation is claimed                |
 | FC-018 | Create-only per-shoot output versions, hashes, owner isolation and purge retry   | Production S3 conditional-write/IAM validation; crash-orphan reconciliation and long-history retention                          |
 | FC-019 | PDF/MD/CSV/SVG/ZIP files parse and have provenance/exclusions                    | Full Unicode PDF fonts and human export-layout review; no public sharing URLs                                                   |
-| FC-020 | GitHub Actions, separate Render web/worker Blueprint, readiness and smoke script | Authorized push, actual remote Actions and Render release with external PostgreSQL/S3/Redis smoke tests                         |
+| FC-020 | GitHub Actions, separate Render web/worker Blueprint, readiness and smoke script | Actual remote Actions and Render release with external PostgreSQL/S3/Redis smoke tests                         |
 | FC-021 | Local consent/isolation/provider/export/security checks and redacted event logs  | Independent audit, managed identity or auth hardening, distributed limits, log drain/alerts, backup/restore and load validation |
 | FC-022 | Four-width responsive assertions/screenshots and pilot rubric                    | Actual photographer/stylist participants, assistive-technology audit and measured pilot outcomes                                |
 
@@ -36,3 +36,9 @@ No new paid credentials are needed for local mock workflows. See DEPLOYMENT.md f
 Storage and SQL transactions are not distributed: a crash after object creation but before metadata commit can leave an unreferenced private object. Create-only writes prevent replacement, but production needs a reconciliation/lifecycle policy. History aggregates need normalization/retention for large-scale use. Default shareable packages still contain participant labels and user-entered planning text, so the UI explicitly asks users to review them before sharing. No photographs are embedded by default, but the app does not promise that text is anonymous.
 
 The controlled pilot rubric lives in PILOT_QA.md. No external deployment, remote CI success, real-user satisfaction metric or paid-provider connection is claimed without evidence.
+
+## Verified GitHub publication (2026-11-07)
+
+The user subsequently authorized pushing all code and publishing to Render. All 131 source/config/test/doc files were committed as `c7c91b8ba64e84ec81975724cb5561f8b05c55d2` and pushed to `https://github.com/mShenoyK/Photoshoot-Planner.git`, branch `main`. `git ls-remote origin refs/heads/main` returned that exact source commit. Although GitHub CLI authentication failed, the configured Git transport successfully authenticated the push. The staged-source scan found no actual credentials, photos, PDFs or private .env files. The supplied source guides remain private attachments.
+
+Render publication was not performed: no Render API credentials/service connection, runtime database binding, Redis URL or storage bucket were configured in this session when rechecked. The user selected reconnection, but that selection did not provision those missing credentials. No deployment URL, remote Actions success or live smoke result is invented. Bind Render access and the required secure production settings from DEPLOYMENT.md to continue the authorized deployment.
