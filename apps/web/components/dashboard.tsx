@@ -47,6 +47,11 @@ export function Dashboard() {
           </p>
         </div>
       </div>
+      <p>
+        <Link className="button secondary" href="/tools">
+          Open standalone posing, lighting or wardrobe
+        </Link>
+      </p>
       <div className="toolbar">
         <h2>
           Your shoots{" "}

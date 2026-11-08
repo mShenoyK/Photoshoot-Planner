@@ -29,6 +29,7 @@ import { objectStore } from "./object-store";
 import { mockMode } from "./store";
 export function publicDocument(doc: KnowledgeDocument) {
   return {
+    representation: doc.representation ?? "ORIGINAL",
     id: doc.id,
     title: doc.title,
     mime: doc.mime,
@@ -128,6 +129,12 @@ export async function processIngestion(
       pages: doc.pages,
       imageOnlyPages: doc.imageOnlyPages,
     };
+  if (doc.representation === "REVIEWED_NOTES")
+    throw new InputError(
+      "NOTES_ONLY",
+      "This source contains reviewed notes only; original PDF bytes are not installed.",
+      409,
+    );
   const bytes = await objectStore().get(doc.storageKey);
   if (fingerprint(bytes) !== doc.sha256)
     throw new InputError(
@@ -325,7 +332,11 @@ export async function privateThumbnail(
   const doc = await withCorpus(owner, (c) =>
     structuredClone(findDocument(c.documents, id)),
   );
-  if (doc.mime !== "application/pdf" || !doc.allowPrivateReview)
+  if (
+    doc.representation === "REVIEWED_NOTES" ||
+    doc.mime !== "application/pdf" ||
+    !doc.allowPrivateReview
+  )
     throw new InputError(
       "PRIVATE_REVIEW_DISABLED",
       "Private page review is not permitted for this source.",
@@ -417,7 +428,8 @@ export async function deleteDocument(owner: string, id: string) {
     async (c) => {
       assertCorpusMutable(c);
       const doc = findDocument(c.documents, id);
-      await objectStore().remove(doc.storageKey);
+      if (doc.representation !== "REVIEWED_NOTES")
+        await objectStore().remove(doc.storageKey);
       doc.status = "DELETED";
       doc.chunks = [];
       doc.allowDerivedUse = false;

@@ -15,6 +15,7 @@ export const categories = [
 ] as const;
 export const shootSchema = z
   .object({
+    workflowKind: z.enum(["POSES", "LIGHTING", "WARDROBE"]).optional(),
     name: z.string().trim().min(3).max(120),
     description: z.string().max(2000).default(""),
     shootType: z.enum(["INDOOR", "OUTDOOR"]),

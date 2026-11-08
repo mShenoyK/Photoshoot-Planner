@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { WorkflowIntake } from "./workflow-intake";
+import type { ReferenceScope } from "@framecraft/shared/inputs";
 import Image from "next/image";
 import type {
   ReferenceReview,
@@ -13,11 +14,16 @@ export function ReferencePanel({
   shootId,
   onApproved,
   refreshKey,
+  scope = "PLAN",
+  intakeEnabled = true,
 }: {
   shootId: string;
+  scope?: ReferenceScope;
+  intakeEnabled?: boolean;
   onApproved?: () => void;
   refreshKey?: string;
 }) {
+  const [intake, setIntake] = useState(false);
   const [media, setMedia] = useState<PublicMedia[]>([]);
   const [reviews, setReviews] = useState<VisibleReview[]>([]);
   const [mode, setMode] = useState("");
@@ -32,7 +38,7 @@ export function ReferencePanel({
         `shoots/${shootId}/references`,
       ),
     ]);
-    setMedia(input.media);
+    setMedia(input.media.filter((m) => (m.workflowScope ?? "PLAN") === scope));
     setReviews(result.reviews);
     setMode(result.provider);
     setConfigured(result.configured);
@@ -41,7 +47,7 @@ export function ReferencePanel({
     load()
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [shootId, refreshKey]);
+  }, [shootId, refreshKey, scope]);
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     setError("");
@@ -60,19 +66,29 @@ export function ReferencePanel({
       <div className="section-intro">
         <div>
           <p className="eyebrow">Start with what inspires you</p>
-          <h2>Your reference images.</h2>
+          <h2>{human(scope)} references.</h2>
           <p>
             Bring a person, a place or a pose. Review visible proportions,
-            colors and light, then confirm what should shape your shoot.
+            colors and light, then confirm what should shape this workflow.
           </p>
         </div>
-        <Link
-          className="button secondary"
-          href={`/shoots/${shootId}/subjects#photo-intake`}
-        >
-          Upload reference images
-        </Link>
+        {intakeEnabled && (
+          <button
+            className="secondary"
+            onClick={() => setIntake(!intake)}
+            aria-expanded={intake}
+          >
+            Upload reference images
+          </button>
+        )}
       </div>
+      {intake && (
+        <WorkflowIntake
+          shootId={shootId}
+          scope={scope}
+          onChanged={() => void load()}
+        />
+      )}
       <p className="hint">
         {mode === "mock"
           ? "Local mock: example observations only. No body-shape or color detection is performed."
@@ -112,7 +128,11 @@ export function ReferencePanel({
                 style={{ width: "100%", height: 200, objectFit: "contain" }}
               />
               <p>
-                {human(m.kind)} · {m.fileName}
+                {human(m.kind)} ·{" "}
+                {m.referenceView
+                  ? human(m.referenceView)
+                  : "View not specified"}{" "}
+                · {m.fileName}
               </p>
               <button
                 className="secondary"
@@ -216,6 +236,10 @@ function ReviewEditor({
             ["sceneSummary", "Scene observations"],
             ["lightingNotes", "Light observations"],
             [
+              "skinColorObservation",
+              "Visible skin color (uncertain, optional)",
+            ],
+            [
               "visibleProportions",
               "Visible proportions / body-shape impression",
             ],
@@ -225,7 +249,7 @@ function ReviewEditor({
             {label}
             <textarea
               maxLength={1500}
-              value={a[key]}
+              value={a[key] ?? ""}
               onChange={(e) => setA({ ...a, [key]: e.target.value })}
             />
           </label>

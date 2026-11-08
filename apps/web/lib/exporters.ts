@@ -88,6 +88,12 @@ export function markdown(input: ExportInput): string {
           md(c.alternatives),
         );
     }
+    for (const note of s.wardrobe.sourceNotes ?? [])
+      lines.push(
+        md(
+          `${note.summary} — ${note.reference.documentTitle}, PDF page ${note.reference.pageStart}, chunk ${note.reference.chunkId}, review ${note.reference.chunkRevision}`,
+        ),
+      );
     lines.push(md(s.wardrobe.provenance));
   }
   lines.push(
@@ -253,7 +259,10 @@ export async function exportBytes(
     files[`illustrations/${f.fileName}`] = f.bytes;
   const refs = input.plan.poses
     .flatMap((p) => p.sourceReferences)
-    .concat(input.plan.lighting.flatMap((l) => l.sourceReferences));
+    .concat(input.plan.lighting.flatMap((l) => l.sourceReferences))
+    .concat(
+      (input.styling?.wardrobe?.sourceNotes ?? []).map((n) => n.reference),
+    );
   const manifest = {
     schemaVersion: 1,
     createdAt: input.createdAt,

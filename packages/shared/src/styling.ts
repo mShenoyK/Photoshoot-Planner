@@ -1,3 +1,4 @@
+import { sourceSchema } from "./planning";
 import { z } from "zod";
 const text = z.string().trim().max(6000);
 const note = z.string().trim().max(1000);
@@ -108,6 +109,8 @@ export const outfitSchema = z
 export const lookSchema = z
   .object({
     subjectId: z.string().uuid(),
+    sourceReferenceIds: z.array(z.string().uuid()).max(100).optional(),
+    sourceAssetIds: z.array(z.string().uuid()).max(100).optional(),
     sourceReferenceId: z.string().uuid().optional(),
     sourceAssetId: z.string().uuid().optional(),
     label: z.string().max(100),
@@ -123,6 +126,11 @@ export const wardrobeSchema = z
     looks: z.array(lookSchema).max(20),
     observations: z.array(observationSchema).max(20),
     rationale: text,
+    sourceNotes: z
+      .array(z.object({ reference: sourceSchema, summary: text }).strict())
+      .max(8)
+      .optional(),
+    knowledgeOnly: z.boolean().optional(),
     provenance: text,
   })
   .strict();
@@ -156,6 +164,7 @@ export const stylingActionSchema = z.discriminatedUnion("action", [
   z
     .object({
       action: z.literal("WARDROBE"),
+      knowledgeOnly: z.boolean().default(false),
       baseRevision: z.number().int().nonnegative(),
       heroSubjectId: z.string().uuid().optional(),
     })

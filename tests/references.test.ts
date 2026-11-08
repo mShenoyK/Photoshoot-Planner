@@ -1,3 +1,8 @@
+import {
+  completePlanInputs,
+  generateCompletePlan,
+  completePlanSnapshot,
+} from "../apps/web/lib/complete-plan-service";
 import { beforeAll, afterAll, afterEach, it, expect, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -73,6 +78,7 @@ async function fixture(allowAnalysis = true, minor = false) {
     mime: "image/jpeg",
     bytes: image.length,
     kind: "SUBJECT_PHOTO",
+    workflowScope: "WARDROBE",
     subjectIds: [subject.id],
   });
   await inputs.upload(
@@ -134,6 +140,9 @@ it("requires review before photo observations can affect a plan, light geometry 
     analyze: async () => a,
   });
   expect(r.approved).toBe(false);
+  await withShoot(owner, f.shoot.id, (s) => {
+    s.media[0].workflowScope = "PLAN";
+  });
   await generatePlan(owner, f.shoot.id, randomUUID(), {
     poseCount: 2,
     useKnowledgeBase: false,
@@ -161,6 +170,9 @@ it("requires review before photo observations can affect a plan, light geometry 
     a.sceneSummary,
   );
   expect(plan.poses[0].stepByStepDirections).toContain(a.posingNotes[0]);
+  await withShoot(owner, f.shoot.id, (s) => {
+    s.media[0].workflowScope = "LIGHTING";
+  });
   let v = await changeStyling(owner, f.shoot.id, {
     action: "LIGHTING",
     baseRevision: 0,
@@ -168,6 +180,9 @@ it("requires review before photo observations can affect a plan, light geometry 
   });
   expect(v.latest!.lighting!.scene.lights[0].x).toBe(4.5);
   expect(v.latest!.lighting!.notes.join(" ")).toContain(a.lightingNotes);
+  await withShoot(owner, f.shoot.id, (s) => {
+    s.media[0].workflowScope = "WARDROBE";
+  });
   v = await changeStyling(owner, f.shoot.id, {
     action: "WARDROBE",
     baseRevision: 1,
@@ -361,4 +376,210 @@ it("does not attribute body proportions from a pose/scene reference to the parti
     analyze: observed,
   });
   expect(r.analysis.visibleProportions).toContain("not attributed");
+});
+
+it("captures only approved current references in a complete bundle and marks revocation stale", async () => {
+  const f = await fixture();
+  const r = await analyzeReference(owner, f.shoot.id, f.asset.id, {
+    name: "test-vision",
+    analyze: observed,
+  });
+  await approveReference(owner, f.shoot.id, r.id, {
+    analysis: r.analysis,
+    approved: true,
+  });
+  const input = {
+    ...(await completePlanInputs(owner, f.shoot.id)),
+    poseCount: 2,
+    useKnowledgeBase: false,
+  };
+  await generateCompletePlan(owner, f.shoot.id, randomUUID(), input);
+  const bundle = await completePlanSnapshot(owner, f.shoot.id);
+  expect(bundle.record?.referenceIds).toEqual([r.id]);
+  expect(bundle.styling?.lighting?.scene.lights[0].x).not.toBe(4.5);
+  expect(bundle.styling?.wardrobe?.looks[0].sourceReferenceId).toBe(r.id);
+  await approveReference(owner, f.shoot.id, r.id, {
+    analysis: r.analysis,
+    approved: false,
+  });
+  expect((await completePlanSnapshot(owner, f.shoot.id)).stale).toBe(true);
+});
+
+it("isolates wardrobe observations from posing and lighting and excludes them in knowledge-only mode", async () => {
+  const f = await fixture();
+  const a = await observed();
+  const r = await analyzeReference(owner, f.shoot.id, f.asset.id, {
+    name: "test-vision",
+    analyze: async () => a,
+  });
+  await approveReference(owner, f.shoot.id, r.id, {
+    analysis: a,
+    approved: true,
+  });
+  await generatePlan(owner, f.shoot.id, randomUUID(), {
+    poseCount: 2,
+    useKnowledgeBase: false,
+  });
+  expect(
+    JSON.stringify((await listPlans(owner, f.shoot.id)).at(-1)),
+  ).not.toContain(a.sceneSummary);
+  const lighting = await changeStyling(owner, f.shoot.id, {
+    action: "LIGHTING",
+    baseRevision: 0,
+    recipe: "CONTEXT",
+  });
+  expect(lighting.latest!.lighting!.scene.lights[0].x).not.toBe(4.5);
+  const styling = await changeStyling(owner, f.shoot.id, {
+    action: "WARDROBE",
+    baseRevision: 1,
+  });
+  expect(styling.latest!.wardrobe!.looks[0].sourceAssetIds).toEqual([
+    f.asset.id,
+  ]);
+  const get = vi.spyOn(LocalObjectStore.prototype, "get");
+  const manual = await changeStyling(owner, f.shoot.id, {
+    action: "WARDROBE",
+    baseRevision: 2,
+    knowledgeOnly: true,
+  });
+  expect(get).not.toHaveBeenCalled();
+  expect(JSON.stringify(manual.latest!.wardrobe)).not.toContain(
+    a.visibleProportions,
+  );
+  expect(manual.latest!.wardrobe!.looks[0].sourceAssetId).toBeUndefined();
+  expect(manual.latest!.wardrobe!.sourceNotes!.length).toBeGreaterThan(0);
+});
+
+it("combines approved front and side notes and drops a locked look if either source is deleted", async () => {
+  const f = await fixture();
+  const first = await analyzeReference(owner, f.shoot.id, f.asset.id, {
+    name: "test-vision",
+    analyze: async () => ({
+      ...(await observed()),
+      visibleProportions: "Front-view fit note.",
+    }),
+  });
+  await approveReference(owner, f.shoot.id, first.id, {
+    analysis: first.analysis,
+    approved: true,
+  });
+  const intent = await inputs.intent(owner, f.shoot.id, {
+    fileName: "side.jpg",
+    mime: "image/jpeg",
+    bytes: image.length,
+    kind: "SUBJECT_PHOTO",
+    workflowScope: "WARDROBE",
+    referenceView: "SIDE",
+    subjectIds: [f.subject.id],
+  });
+  await inputs.upload(
+    owner,
+    f.shoot.id,
+    intent.id,
+    new Request("http://localhost/upload", {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${intent.uploadToken}`,
+        "Content-Type": "image/jpeg",
+      },
+      body: Uint8Array.from(image),
+    }),
+  );
+  const asset = await inputs.complete(owner, f.shoot.id, intent.id);
+  const second = await analyzeReference(owner, f.shoot.id, asset.id, {
+    name: "test-vision",
+    analyze: async () => ({
+      ...(await observed()),
+      visibleProportions: "Side-view drape note.",
+    }),
+  });
+  await approveReference(owner, f.shoot.id, second.id, {
+    analysis: second.analysis,
+    approved: true,
+  });
+  const view = await changeStyling(owner, f.shoot.id, {
+    action: "WARDROBE",
+    baseRevision: 0,
+  });
+  const look = view.latest!.wardrobe!.looks[0];
+  expect(look.sourceAssetIds!.sort()).toEqual([asset.id, f.asset.id].sort());
+  expect(look.candidates[0].comfort).toContain("Front-view fit note");
+  expect(look.candidates[0].comfort).toContain("Side-view drape note");
+  await changeStyling(owner, f.shoot.id, {
+    action: "SELECT",
+    baseRevision: 1,
+    subjectId: f.subject.id,
+    candidateId: look.selectedId,
+    locked: true,
+  });
+  await inputs.removeMedia(owner, f.shoot.id, asset.id);
+  const regenerated = await changeStyling(owner, f.shoot.id, {
+    action: "WARDROBE",
+    baseRevision: 2,
+  });
+  expect(regenerated.latest!.wardrobe!.looks[0].locked).toBe(false);
+  expect(regenerated.latest!.wardrobe!.looks[0].sourceAssetIds).toEqual([
+    f.asset.id,
+  ]);
+});
+
+it("retains knowledge-only mode when regenerating a guide section with an approved plan reference available", async () => {
+  const f = await fixture();
+  await withShoot(owner, f.shoot.id, (s) => {
+    s.media[0].workflowScope = "PLAN";
+  });
+  const a = await observed();
+  const review = await analyzeReference(owner, f.shoot.id, f.asset.id, {
+    name: "test-vision",
+    analyze: async () => a,
+  });
+  await approveReference(owner, f.shoot.id, review.id, {
+    analysis: a,
+    approved: true,
+  });
+  await generatePlan(owner, f.shoot.id, randomUUID(), {
+    poseCount: 2,
+    useKnowledgeBase: true,
+    knowledgeOnly: true,
+  });
+  await generatePlan(owner, f.shoot.id, randomUUID(), {
+    poseCount: 2,
+    useKnowledgeBase: true,
+    section: "poses",
+    baseVersion: 1,
+  });
+  const plan = (await listPlans(owner, f.shoot.id)).at(-1)!;
+  expect(plan.knowledgeOnly).toBe(true);
+  expect(JSON.stringify(plan)).not.toContain(a.sceneSummary);
+  expect(plan.poses[0].sourceReferences.length).toBeGreaterThan(0);
+});
+
+it("uses posing-scoped references in the posing tool inside a shoot, without leaking them into the full plan", async () => {
+  const f = await fixture();
+  await withShoot(owner, f.shoot.id, (s) => {
+    s.media[0].workflowScope = "POSES";
+  });
+  const a = await observed();
+  const review = await analyzeReference(owner, f.shoot.id, f.asset.id, {
+    name: "test-vision",
+    analyze: async () => a,
+  });
+  await approveReference(owner, f.shoot.id, review.id, {
+    analysis: a,
+    approved: true,
+  });
+  await generatePlan(owner, f.shoot.id, randomUUID(), {
+    poseCount: 2,
+    useKnowledgeBase: false,
+    referenceScope: "POSES",
+  });
+  let plan = (await listPlans(owner, f.shoot.id)).at(-1)!;
+  expect(plan.referenceScope).toBe("POSES");
+  expect(JSON.stringify(plan)).toContain(a.sceneSummary);
+  await generatePlan(owner, f.shoot.id, randomUUID(), {
+    poseCount: 2,
+    useKnowledgeBase: false,
+  });
+  plan = (await listPlans(owner, f.shoot.id)).at(-1)!;
+  expect(JSON.stringify(plan)).not.toContain(a.sceneSummary);
 });

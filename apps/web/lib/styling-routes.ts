@@ -1,3 +1,4 @@
+import { InputError } from "./input-repository";
 import { readStyling, changeStyling } from "./styling-service";
 import { renderLightingSvg } from "@framecraft/shared/lighting-svg";
 import type { InputHttp } from "./inputs-routes";
@@ -16,6 +17,40 @@ export async function stylingRoutes(
       await changeStyling(owner, id, await http.readJson(request)),
       201,
     );
+  if (
+    parts.length === 4 &&
+    request.method === "GET" &&
+    view === "export.json"
+  ) {
+    const data = await readStyling(owner, id);
+    if (!data.latest)
+      throw new InputError("NOT_READY", "Generate styling first.", 409);
+    if (data.stale || !data.sourcesAvailable)
+      throw new InputError(
+        "STALE_INPUTS",
+        "Regenerate current styling and source citations before exporting.",
+        409,
+      );
+    return new Response(
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          styling: data.latest,
+          exclusions: ["reference photos", "source books", "consent records"],
+        },
+        null,
+        2,
+      ),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Disposition": "attachment; filename=styling.json",
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      },
+    );
+  }
   if (
     parts.length === 4 &&
     request.method === "GET" &&

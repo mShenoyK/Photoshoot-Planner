@@ -77,6 +77,7 @@ export type KnowledgeChunk = {
   embeddingModel?: string;
 };
 export type KnowledgeDocument = DocumentInput & {
+  representation?: "REVIEWED_NOTES";
   id: string;
   ownerId: string;
   sha256: string;

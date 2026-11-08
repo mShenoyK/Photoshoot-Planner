@@ -8,7 +8,7 @@ export function ShootNav({ shootId }: { shootId: string }) {
     <nav className="shoot-nav" aria-label="Shoot workspace">
       {[
         ["", "Overview"],
-        ["/subjects", "Reference images"],
+        ["/subjects", "People & equipment"],
         ["/plan", "Shoot plan"],
         ["/poses", "Posing guide"],
         ["/lighting", "Lighting Lab"],

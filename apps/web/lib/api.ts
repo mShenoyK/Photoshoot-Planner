@@ -1,3 +1,4 @@
+import { workflowRoutes } from "./workflow-routes";
 import { referenceRoutes } from "./reference-routes";
 import { applicationOrigin } from "./application-origin";
 import { readiness } from "./readiness";
@@ -140,8 +141,16 @@ async function handleRequest(request: Request) {
     }
     const owner = await identity(request);
     if (!owner) return error("UNAUTHORIZED", "Sign in to continue.", 401);
-    const references = await referenceRoutes(request, parts, owner, {ok:response,readJson});
-    if(references) return references;
+    const workflow = await workflowRoutes(request, parts, owner, {
+      ok: response,
+      readJson,
+    });
+    if (workflow) return workflow;
+    const references = await referenceRoutes(request, parts, owner, {
+      ok: response,
+      readJson,
+    });
+    if (references) return references;
     const artifacts = await artifactRoutes(request, parts, owner, {
       ok: response,
       readJson,
@@ -167,7 +176,7 @@ async function handleRequest(request: Request) {
     const id = parts[1];
     if (request.method === "GET") {
       const list = await store.list(owner);
-      if (!id) return response(list);
+      if (!id) return response(list.filter((s) => !s.workflowKind));
       const shoot = list.find((s) => s.id === id);
       return shoot
         ? response(shoot)

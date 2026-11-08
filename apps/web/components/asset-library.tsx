@@ -7,7 +7,13 @@ import type { Styling } from "@framecraft/shared/styling";
 import type { Artifact } from "@framecraft/shared/artifacts";
 import type { TaskJob } from "@framecraft/shared/knowledge";
 import { api, human } from "./client";
-export function AssetLibrary({ shootId }: { shootId: string }) {
+export function AssetLibrary({
+  shootId,
+  standalone = false,
+}: {
+  shootId: string;
+  standalone?: boolean;
+}) {
   const [plans, setPlans] = useState<ShootPlan[] | null>(null);
   const [styling, setStyling] = useState<Styling[]>([]);
   const [artifacts, setArtifacts] = useState<Omit<Artifact, "storageKey">[]>(
@@ -103,12 +109,17 @@ export function AssetLibrary({ shootId }: { shootId: string }) {
   };
   return (
     <section className="container">
-      <nav className="actions">
-        <Link href={`/shoots/${shootId}`}>Shoot brief</Link>
-        <Link href={`/shoots/${shootId}/plan`}>Pose plan</Link>
-        <Link href={`/shoots/${shootId}/lighting`}>Lighting Lab</Link>
-        <Link href={`/shoots/${shootId}/wardrobe`}>Wardrobe Stylist</Link>
-      </nav>
+      {standalone ? (
+        <Link href={`/tools/poses/${shootId}`}>← Posing session</Link>
+      ) : (
+        <nav className="actions">
+          <Link href={`/shoots/${shootId}`}>Shoot brief</Link>
+          <Link href={`/shoots/${shootId}/plan`}>Pose plan</Link>
+          <Link href={`/shoots/${shootId}/lighting`}>Lighting Lab</Link>
+          <Link href={`/shoots/${shootId}/wardrobe`}>Wardrobe Stylist</Link>
+        </nav>
+      )}
+
       <h1>Private files & exports</h1>
       <p>
         On-demand original schematic illustrations and immutable downloads. No
@@ -120,13 +131,24 @@ export function AssetLibrary({ shootId }: { shootId: string }) {
       {plans &&
         (!plans.length ? (
           <p>
-            No saved plan yet.{" "}
-            <Link href={`/shoots/${shootId}/plan`}>Generate a plan first</Link>.
+            {standalone ? "No saved posing guide yet." : "No saved plan yet."}{" "}
+            <Link
+              href={
+                standalone
+                  ? `/tools/poses/${shootId}`
+                  : `/shoots/${shootId}/plan`
+              }
+            >
+              {standalone
+                ? "Generate a posing guide first"
+                : "Generate a plan first"}
+            </Link>
+            .
           </p>
         ) : (
           <fieldset disabled={busy || active}>
             <label>
-              Plan version
+              {standalone ? "Guide version" : "Plan version"}
               <select
                 value={planId}
                 onChange={(e) => {

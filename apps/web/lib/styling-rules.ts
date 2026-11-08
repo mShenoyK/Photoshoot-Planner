@@ -1,4 +1,8 @@
-import { approvedReferences, analysisPermission } from "./reference-service";
+import {
+  approvedReferences,
+  analysisPermission,
+  scopedInputs,
+} from "./reference-service";
 import type { ReferenceAnalysis } from "@framecraft/shared/references";
 import type { Shoot } from "@framecraft/shared";
 import type { InputState, Subject } from "@framecraft/shared/inputs";
@@ -19,6 +23,7 @@ export function lightingRules(
   recipe: Lighting["recipe"],
   fill: boolean,
 ): Lighting {
+  state = scopedInputs(state, "LIGHTING");
   if (
     state.subjects.length &&
     shoot.subjectCount &&
@@ -270,21 +275,28 @@ function candidates(
       ],
       rationale: `${photo ? `Reviewed photo guidance: ${photo.outfits[i]?.rationale}. ` : ""}Coordinates color weight without identical outfits. Use solid or broad, low-density patterns so faces remain readable. ${preferred.length ? "Stated color preferences take priority." : "Palette is a suggestion; no appearance or personality was inferred."}`,
       suitability: `${shoot.settings.sceneCategory}: ${shoot.settings.sceneDetails || "verify backdrop contrast on location"}. ${shoot.settings.lightMode === "NATURAL" ? "Breathable layers for shade; check wind, heat and weather." : "Matte fabric reduces flash glare; check sheen and white clipping under the actual light."} Occasion: ${shoot.settings.occasion || "confirm formality"}. ${observation?.visibleColors ? `Reported garment colors: ${observation.visibleColors}; uncertain, verify under neutral light before using. ${observation.uncertainty}` : ""}`,
-      comfort: `${photo ? `Editable visual proportion impression: ${photo.visibleProportions.slice(0, 800)}. ${photo.fitSuggestions.join(" ").slice(0, 1200)} These are not measurements. ` : ""}Confirm size ${p.clothingSize || "with participant"}; never infer measurements. ${p.fitComfort || "Allow free movement and seated comfort."} ${p.mobilityNotes || "Ask about footwear, sensory needs and accessible changing space."} ${observation?.fitNotes ? `User fit note: ${observation.fitNotes}` : ""}`,
+      comfort: `${photo ? `Editable visual proportion impression: ${photo.visibleProportions.slice(0, 800)}. ${photo.fitSuggestions.join(" ").slice(0, 1200)} ${photo.skinColorObservation ? `Visible color impression: ${photo.skinColorObservation}. ` : ""}These are not measurements. ` : ""}Confirm size ${p.clothingSize || "with participant"}; never infer measurements. ${p.fitComfort || "Allow free movement and seated comfort."} ${p.mobilityNotes || "Ask about footwear, sensory needs and accessible changing space."} ${observation?.fitNotes ? `User fit note: ${observation.fitNotes}` : ""}`,
       alternatives: `${p.stylePreferences ? `Respect stated preferences: ${p.stylePreferences}. ` : "Confirm cultural coverage and personal preferences. "}Use existing clothes or low-cost separates${p.budget !== undefined ? ` within the stated ${p.currency} ${p.budget} budget (no live prices checked)` : "; confirm budget"}. Add/remove layers for weather. ${observation?.fabricNotes ? `Review user fabric note: ${observation.fabricNotes}` : ""}`,
     }),
   );
 }
 function photoLookAllowed(look: Wardrobe["looks"][number], state: InputState) {
   if (!look.sourceReferenceId && !look.sourceAssetId) return true;
-  const asset = state.media.find((a) => a.id === look.sourceAssetId);
-  if (!asset) return false;
-  try {
-    analysisPermission(state, asset);
-    return true;
-  } catch {
-    return false;
-  }
+  const ids =
+    look.sourceAssetIds ?? (look.sourceAssetId ? [look.sourceAssetId] : []);
+  return (
+    ids.length > 0 &&
+    ids.every((id) => {
+      const asset = state.media.find((a) => a.id === id);
+      if (!asset) return false;
+      try {
+        analysisPermission(state, asset);
+        return true;
+      } catch {
+        return false;
+      }
+    })
+  );
 }
 export function wardrobeRules(
   shoot: Shoot,
@@ -292,6 +304,7 @@ export function wardrobeRules(
   old?: Wardrobe,
   heroSubjectId?: string,
 ): Wardrobe {
+  state = scopedInputs(state, "WARDROBE");
   const subjects = state.subjects;
   if (!subjects.length)
     throw new InputError(
@@ -352,6 +365,41 @@ export function wardrobeRules(
     old?.observations.filter((o) =>
       subjects.some((p) => p.id === o.subjectId),
     ) ?? [];
+  const reviewsFor = (id: string) =>
+    approvedReferences(state)
+      .slice()
+      .reverse()
+      .filter(
+        (r) =>
+          r.subjectIds.length === 1 &&
+          r.subjectIds[0] === id &&
+          state.media.find((a) => a.id === r.assetId)?.kind === "SUBJECT_PHOTO",
+      );
+  const combined = (id: string): ReferenceAnalysis | undefined => {
+    const reviews = reviewsFor(id);
+    if (!reviews.length) return undefined;
+    return {
+      ...reviews[0].analysis,
+      visibleProportions: reviews
+        .map(
+          (r) =>
+            `${state.media.find((a) => a.id === r.assetId)?.referenceView ?? "Reference"}: ${r.analysis.visibleProportions}`,
+        )
+        .join(" ")
+        .slice(0, 800),
+      skinColorObservation: reviews
+        .map((r) => r.analysis.skinColorObservation ?? "")
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 400),
+      fitSuggestions: reviews
+        .flatMap((r) => r.analysis.fitSuggestions)
+        .slice(0, 6),
+      suggestedColors: [
+        ...new Set(reviews.flatMap((r) => r.analysis.suggestedColors)),
+      ].slice(0, 8),
+    };
+  };
   return wardrobeSchema.parse({
     palette,
     heroSubjectId: hero,
@@ -360,6 +408,8 @@ export function wardrobeRules(
       (p, index) =>
         retained.find((l) => l.subjectId === p.id) ?? {
           subjectId: p.id,
+          sourceReferenceIds: reviewsFor(p.id).map((r) => r.id),
+          sourceAssetIds: reviewsFor(p.id).map((r) => r.assetId),
           sourceReferenceId: approvedReferences(state)
             .slice()
             .reverse()
@@ -389,16 +439,7 @@ export function wardrobeRules(
             ],
             shoot,
             observations.find((o) => o.subjectId === p.id),
-            approvedReferences(state)
-              .slice()
-              .reverse()
-              .find(
-                (r) =>
-                  r.subjectIds.length === 1 &&
-                  r.subjectIds[0] === p.id &&
-                  state.media.find((a) => a.id === r.assetId)?.kind ===
-                    "SUBJECT_PHOTO",
-              )?.analysis,
+            combined(p.id),
           ),
           selectedId: `${p.id}-0`,
           locked: false,

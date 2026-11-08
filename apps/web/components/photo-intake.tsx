@@ -2,6 +2,8 @@
 import { useState } from "react";
 import {
   mediaKinds,
+  referenceViews,
+  type ReferenceScope,
   type Subject,
   type MediaAsset,
 } from "@framecraft/shared/inputs";
@@ -15,14 +17,17 @@ export function PhotoIntake({
   subjects,
   media,
   onChanged,
+  scope,
 }: {
   shootId: string;
   subjects: Subject[];
   media: PublicMedia[];
   onChanged: () => void;
+  scope?: ReferenceScope;
 }) {
   const [kind, setKind] =
     useState<(typeof mediaKinds)[number]>("SUBJECT_PHOTO");
+  const [view, setView] = useState<(typeof referenceViews)[number]>("FRONT");
   const [ids, setIds] = useState<string[]>([]);
   const [noPeople, setNoPeople] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -52,6 +57,8 @@ export function PhotoIntake({
           mime: file.type,
           bytes: file.size,
           kind,
+          workflowScope: scope,
+          referenceView: view,
           subjectIds: ids,
           noIdentifiablePeople: noPeople && !ids.length,
         });
@@ -95,6 +102,38 @@ export function PhotoIntake({
         each person’s consent before uploading. Changing consent removes linked
         photos; you may need to upload them again.
       </p>
+      {scope && (
+        <p className="quality-note">
+          These images belong only to {human(scope)}. They are not automatically
+          shared with other tools.
+        </p>
+      )}
+      {scope === "WARDROBE" && (
+        <p>
+          Optional views: front in neutral light for visible color; side for
+          garment drape; head-to-toe for outfit proportions and shoes; detail
+          for fabric; inspiration for your preferred style. Upload only views
+          you are comfortable sharing, in normal clothing. Skin-color
+          impressions and body proportions are uncertain, editable observations,
+          never ethnicity, health or measurements. No photos are required in
+          knowledge-only mode.
+        </p>
+      )}
+      <div className="field">
+        <label htmlFor="reference-view">Reference view</label>
+        <select
+          id="reference-view"
+          value={view}
+          disabled={busy || !!complete}
+          onChange={(e) => setView(e.target.value as typeof view)}
+        >
+          {referenceViews.map((v) => (
+            <option key={v} value={v}>
+              {human(v)}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="field">
         <label htmlFor="photo-kind">Reference type</label>
         <select

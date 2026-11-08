@@ -1,3 +1,4 @@
+import { generateCompletePlan } from "./complete-plan-service";
 import { createArtifact } from "./artifact-service";
 import { randomUUID } from "node:crypto";
 import { Queue } from "bullmq";
@@ -182,18 +183,29 @@ export async function runTask(owner: string, id: string) {
     else {
       if (!claimed.shootId)
         throw new InputError("INVALID_JOB", "Missing shoot.");
-      result = await generatePlan(owner, claimed.shootId, claimed.id, {
-        poseCount: Number(claimed.input.poseCount),
-        useKnowledgeBase: claimed.input.useKnowledgeBase === true,
-        section:
-          typeof claimed.input.section === "string"
-            ? claimed.input.section
-            : undefined,
-        baseVersion:
-          typeof claimed.input.baseVersion === "number"
-            ? claimed.input.baseVersion
-            : undefined,
-      });
+      result =
+        claimed.input.complete === true
+          ? await generateCompletePlan(
+              owner,
+              claimed.shootId,
+              claimed.id,
+              claimed.input,
+            )
+          : await generatePlan(owner, claimed.shootId, claimed.id, {
+              poseCount: Number(claimed.input.poseCount),
+              useKnowledgeBase: claimed.input.useKnowledgeBase === true,
+              knowledgeOnly: claimed.input.knowledgeOnly === true,
+              referenceScope:
+                claimed.input.referenceScope === "POSES" ? "POSES" : "PLAN",
+              section:
+                typeof claimed.input.section === "string"
+                  ? claimed.input.section
+                  : undefined,
+              baseVersion:
+                typeof claimed.input.baseVersion === "number"
+                  ? claimed.input.baseVersion
+                  : undefined,
+            });
     }
     if (process.env.NODE_ENV !== "test")
       console.info(

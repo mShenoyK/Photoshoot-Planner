@@ -96,3 +96,14 @@ See PHASE_4_REPORT.md. Stop at FC-016; FC-017–019 are next (original illustrat
 - [ ] Photographer/stylist pilot, independent accessibility/security review and remaining auth hardening
 
 See PHASE_5_REPORT.md and DEPLOYMENT.md. Template/code readiness is not deployed/validated infrastructure or a completed real-user pilot.
+
+## Independent tools follow-up (FC-012–FC-019)
+
+- [x] Standalone posing, lighting and wardrobe sessions with editable context; no shoot-plan prerequisite.
+- [x] In-place reference intake, workflow scope, view labels, consent and owner isolation.
+- [x] Optional multi-view wardrobe observations; visible skin/color/proportion impressions remain uncertain and editable.
+- [x] Separate no-photo knowledge modes with valid installed document/page/chunk provenance.
+- [x] Reviewed-note library from three unique supplied PDFs; duplicate Complete Guide deduplicated.
+- [x] Preserve the preceding complete-plan bundle implementation and its tests.
+- [ ] Import the oversized 100 Posing Ideas workbook when a transferable copy is available.
+- [ ] Verify live OpenAI, production S3, Render deployment and remote CI using configured accounts.

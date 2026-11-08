@@ -22,6 +22,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </Link>
           <nav aria-label="Main navigation">
             <Link href="/dashboard">Workspace</Link>
+            <Link href="/tools">Creative tools</Link>
             <Link href="/shoots/new">
               New shoot <span aria-hidden>＋</span>
             </Link>

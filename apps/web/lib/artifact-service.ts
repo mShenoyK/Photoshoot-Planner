@@ -56,9 +56,15 @@ export async function createArtifact(
     if (
       styling &&
       ((styling.lighting &&
-        styling.lightingInputHash !== stylingInputHash(s, shoot)) ||
+        styling.lightingInputHash !== stylingInputHash(s, shoot, "LIGHTING")) ||
         (styling.wardrobe &&
-          styling.wardrobeInputHash !== stylingInputHash(s, shoot)))
+          styling.wardrobeInputHash !==
+            stylingInputHash(
+              s,
+              shoot,
+              "WARDROBE",
+              styling.wardrobe.knowledgeOnly,
+            )))
     )
       throw new InputError(
         "STALE_INPUTS",
@@ -95,7 +101,14 @@ export async function createArtifact(
     maxResults: 1,
   });
   try {
-    if (!(await validateSources(owner, allReferences(plan))))
+    if (
+      !(await validateSources(owner, [
+        ...allReferences(plan),
+        ...(snapshot.styling?.wardrobe?.sourceNotes ?? []).map(
+          (n) => n.reference,
+        ),
+      ]))
+    )
       throw new InputError(
         "SOURCE_UNAVAILABLE",
         "A cited source is no longer available; revise the plan before creating a shareable export.",
@@ -254,7 +267,11 @@ export async function downloadArtifact(
     if (!a) throw new InputError("NOT_FOUND", "Artifact not found.", 404);
     const p = s.plans?.find((p) => p.id === a.planId);
     if (!p) throw new InputError("NOT_FOUND", "Plan not found.", 404);
-    return allReferences(p);
+    const styling = s.styling?.find((v) => v.revision === a.stylingRevision);
+    return [
+      ...allReferences(p),
+      ...(styling?.wardrobe?.sourceNotes ?? []).map((n) => n.reference),
+    ];
   });
   const lease = randomUUID();
   if (refs.length)

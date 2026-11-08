@@ -82,6 +82,21 @@ export const mediaKinds = [
   "WARDROBE_REFERENCE",
   "OTHER",
 ] as const;
+export const referenceScopes = [
+  "PLAN",
+  "POSES",
+  "LIGHTING",
+  "WARDROBE",
+] as const;
+export type ReferenceScope = (typeof referenceScopes)[number];
+export const referenceViews = [
+  "FRONT",
+  "SIDE",
+  "FULL_LENGTH",
+  "DETAIL",
+  "INSPIRATION",
+  "OTHER",
+] as const;
 export const uploadIntentSchema = z
   .object({
     fileName: z
@@ -100,6 +115,8 @@ export const uploadIntentSchema = z
     mime: z.enum(["image/jpeg", "image/png", "image/webp"]),
     bytes: z.number().int().positive(),
     kind: z.enum(mediaKinds),
+    workflowScope: z.enum(referenceScopes).optional(),
+    referenceView: z.enum(referenceViews).optional(),
     subjectIds: z.array(z.string().uuid()).max(20),
     noIdentifiablePeople: z.boolean().default(false),
   })
@@ -131,6 +148,8 @@ export type UploadIntent = UploadInput & {
   assetId?: string;
 };
 export type MediaAsset = {
+  workflowScope?: ReferenceScope;
+  referenceView?: (typeof referenceViews)[number];
   id: string;
   kind: UploadInput["kind"];
   fileName: string;
@@ -171,7 +190,16 @@ export const canonPreset: z.infer<typeof equipmentSchema> = {
   notes:
     "Starting equipment inventory only. Exposure and light placement depend on the actual scene.",
 };
+export type CompletePlanRecord = {
+  jobId: string;
+  planId: string;
+  stylingRevision: number;
+  inputHash: string;
+  createdAt: string;
+  referenceIds: string[];
+};
 export type InputState = {
+  completePlans?: CompletePlanRecord[];
   referenceReviews?: import("./references").ReferenceReview[];
   artifacts?: import("./artifacts").Artifact[];
   styling?: import("./styling").Styling[];

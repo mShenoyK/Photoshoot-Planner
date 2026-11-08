@@ -108,6 +108,8 @@ export const planSchema = z
     provider: z.string().max(100),
     inputHash: z.string(),
     genericFallback: z.boolean(),
+    knowledgeOnly: z.boolean().optional(),
+    referenceScope: z.enum(["PLAN", "POSES"]).optional(),
     lockedSections: z.array(sectionSchema).max(3),
     editedSections: z.array(sectionSchema).max(3),
   })
@@ -117,6 +119,8 @@ export const generationSchema = z
   .object({
     poseCount: z.number().int().min(1).max(12).default(6),
     useKnowledgeBase: z.boolean().default(true),
+    knowledgeOnly: z.boolean().default(false),
+    referenceScope: z.enum(["PLAN", "POSES"]).default("PLAN"),
     idempotencyKey: z.string().min(8).max(100),
   })
   .strict();

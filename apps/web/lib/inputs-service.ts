@@ -78,7 +78,9 @@ async function discard(state: InputState, subjectId?: string) {
     if (matches(intent.subjectIds)) intent.status = "INVALID";
   const removed = state.media.filter((a) => matches(a.subjectIds));
   state.media = state.media.filter((a) => !matches(a.subjectIds));
-  state.referenceReviews = (state.referenceReviews ?? []).filter(r => !removed.some(a=>a.id===r.assetId));
+  state.referenceReviews = (state.referenceReviews ?? []).filter(
+    (r) => !removed.some((a) => a.id === r.assetId),
+  );
   state.pendingDeletionKeys = [
     ...new Set([
       ...(state.pendingDeletionKeys ?? []),
@@ -198,7 +200,16 @@ export const inputs = {
         "Image exceeds the upload limit.",
         413,
       );
-    return withShoot(owner, shootId, async (state) => {
+    return withShoot(owner, shootId, async (state, workspace) => {
+      if (workspace.workflowKind) {
+        if (data.workflowScope && data.workflowScope !== workspace.workflowKind)
+          throw new InputError(
+            "WORKFLOW_SCOPE",
+            "Attach references to the active workflow only.",
+            409,
+          );
+        data.workflowScope = workspace.workflowKind;
+      }
       const ids = consentIds(state, data.subjectIds);
       state.intents = state.intents.filter(
         (i) =>
@@ -329,6 +340,8 @@ export const inputs = {
       state.media.push({
         id: assetId,
         kind: intent.kind,
+        workflowScope: intent.workflowScope,
+        referenceView: intent.referenceView,
         fileName: intent.fileName,
         mime: "image/webp",
         bytes: quality.bytes.length,

@@ -8,6 +8,7 @@ export const referenceAnalysisSchema = z
     posingNotes: z.array(text).max(6),
     visibleColors: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).max(8),
     visibleProportions: text,
+    skinColorObservation: text.optional(),
     fitSuggestions: z.array(text).max(6),
     suggestedColors: z
       .array(z.string().regex(/^#[0-9a-fA-F]{6}$/))

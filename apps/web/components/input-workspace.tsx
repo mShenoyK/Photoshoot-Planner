@@ -20,7 +20,13 @@ type Snapshot = {
   cameraKit: InputState["cameraKit"] | null;
   deletionPending: number;
 };
-export function InputWorkspace({ shootId }: { shootId: string }) {
+export function InputWorkspace({
+  shootId,
+  embedded = false,
+}: {
+  shootId: string;
+  embedded?: boolean;
+}) {
   const [data, setData] = useState<Snapshot | null>(null);
   const [shoot, setShoot] = useState<Shoot | null>(null);
   const [error, setError] = useState("");
@@ -56,14 +62,16 @@ export function InputWorkspace({ shootId }: { shootId: string }) {
     );
   return (
     <>
-      <ShootNav shootId={shootId} />
-      <Link href={"/shoots/" + shootId} className="hint">
-        ← Shoot brief
-      </Link>
+      {!embedded && <ShootNav shootId={shootId} />}
+      {!embedded && (
+        <Link href={"/shoots/" + shootId} className="hint">
+          ← Shoot brief
+        </Link>
+      )}
       <div className="hero">
         <div>
           <p className="eyebrow">People, permission & preparation</p>
-          <h1>{shoot.name}</h1>
+          {embedded ? <h2>People & equipment</h2> : <h1>{shoot.name}</h1>}
           <p>
             Make room for every person’s preferences and comfort. Photos are
             always optional.
@@ -198,16 +206,24 @@ export function InputWorkspace({ shootId }: { shootId: string }) {
         </section>
       )}
       <div className="workspace-stack">
-        <PhotoIntake
-          shootId={shootId}
-          subjects={data.subjects}
-          media={data.media}
-          onChanged={() => void load()}
-        />
-        <ReferencePanel
-          shootId={shootId}
-          refreshKey={data.media.map((m) => m.id).join(",")}
-        />
+        {!embedded && (
+          <PhotoIntake
+            shootId={shootId}
+            subjects={data.subjects}
+            scope="PLAN"
+            media={data.media.filter(
+              (m) => (m.workflowScope ?? "PLAN") === "PLAN",
+            )}
+            onChanged={() => void load()}
+          />
+        )}
+        {!embedded && (
+          <ReferencePanel
+            intakeEnabled={false}
+            shootId={shootId}
+            refreshKey={data.media.map((m) => m.id).join(",")}
+          />
+        )}
         <section className="banner">
           <div>
             <h3>Selected equipment</h3>

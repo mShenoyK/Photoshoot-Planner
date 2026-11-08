@@ -6,6 +6,7 @@ for (const width of [375, 1440])
   test(`reference-led family planning and refreshed design at ${width}px`, async ({
     page,
   }) => {
+    test.setTimeout(60000);
     await page.setViewportSize({ width, height: 950 });
     await page.goto("/");
     await expect(
@@ -87,7 +88,7 @@ for (const width of [375, 1440])
     await post(`shoots/${shoot.id}/uploads/${intent.id}/complete`, {});
     await page.goto(`/shoots/${shoot.id}/plan`);
     await expect(
-      page.getByRole("heading", { name: "Your reference images." }),
+      page.getByRole("heading", { name: "Plan references." }),
     ).toBeVisible();
     page.once("dialog", (d) => d.accept());
     await page
@@ -109,13 +110,68 @@ for (const width of [375, 1440])
       .getByRole("button", { name: "Confirm and use reference", exact: true })
       .click();
     await expect(page.getByText(/Reviewed and included/)).toBeVisible();
+    // Explicitly attach separate copies to each active workflow; references never cross scopes automatically.
+    const originalReview = (
+      await (
+        await page.request.get(`/api/v1/shoots/${shoot.id}/references`)
+      ).json()
+    ).data.reviews[0];
+    for (const workflowScope of ["LIGHTING", "WARDROBE"]) {
+      const next = await post(`shoots/${shoot.id}/upload-intents`, {
+        fileName: "synthetic-reference.jpg",
+        mime: "image/jpeg",
+        bytes: image.length,
+        kind: "SUBJECT_PHOTO",
+        workflowScope,
+        subjectIds: [primary],
+      });
+      const upload = await page.request.put(next.uploadUrl, {
+        headers: {
+          ...headers,
+          "Content-Type": "image/jpeg",
+          Authorization: `Bearer ${next.uploadToken}`,
+        },
+        data: image,
+      });
+      expect(upload.ok()).toBeTruthy();
+      const asset = await post(
+        `shoots/${shoot.id}/uploads/${next.id}/complete`,
+        {},
+      );
+      const review = await post(
+        `shoots/${shoot.id}/references/${asset.id}/analyze`,
+        { acknowledged: true },
+      );
+      const saved = await page.request.patch(
+        `/api/v1/shoots/${shoot.id}/references/${review.id}`,
+        {
+          headers,
+          data: { analysis: originalReview.analysis, approved: true },
+        },
+      );
+      expect(saved.ok(), await saved.text()).toBeTruthy();
+    }
+
     await page
-      .getByRole("button", { name: "Generate plan", exact: true })
+      .getByRole("button", {
+        name: "Generate complete shoot plan",
+        exact: true,
+      })
       .click();
     await expect(
       page.getByRole("heading", { name: "Posing guide", exact: true }),
     ).toBeVisible();
     await expect(page.locator("[data-pose-subject]")).toHaveCount(24);
+    await expect(
+      page.getByRole("heading", { name: "Lighting setup", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Wardrobe looks", exact: true }),
+    ).toBeVisible();
+    await expect(page.locator(".outfit-visual")).toHaveCount(12);
+    await expect(
+      page.getByText(/This bundle used 3 reviewed references/),
+    ).toBeVisible();
     await expect(
       page.getByText(/Reviewed photo context: Our garden/),
     ).toBeVisible();
@@ -130,7 +186,7 @@ for (const width of [375, 1440])
     });
     await page.getByRole("link", { name: "Lighting Lab", exact: true }).click();
     await page
-      .getByRole("button", { name: "Generate lighting", exact: true })
+      .getByRole("button", { name: "Regenerate lighting", exact: true })
       .click();
     await expect(page.getByLabel("Key horizontal position (m)")).toHaveValue(
       "4.5",
@@ -151,7 +207,7 @@ for (const width of [375, 1440])
       .getByRole("link", { name: "Wardrobe Stylist", exact: true })
       .click();
     await page
-      .getByRole("button", { name: "Generate wardrobe", exact: true })
+      .getByRole("button", { name: "Rebalance unlocked looks", exact: true })
       .click();
     const person = page.getByRole("region", { name: "Looks for Person 1" });
     await expect(

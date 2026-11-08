@@ -87,6 +87,10 @@ export class MockPlanner implements TextPlanner {
           i % 2
             ? "Use a gentle diagonal in the framing without asking anyone to balance or climb."
             : "Keep the camera near eye level and check the background before making a small framing adjustment.",
+          input.shoot.shootType === "OUTDOOR"
+            ? "Choose level accessible ground in open shade; turn faces toward the open sky, check for squinting and keep a weather backup."
+            : "Use stable seating with a clear walking route; turn the arrangement toward the chosen key light and check every face for even coverage.",
+          `For ${input.shoot.settings.occasion || "this portrait session"}, invite ${count && count > 1 ? "a shared glance or small conversation, keeping every face visible" : "a relaxed glance toward camera and then away"}; ask which expression feels natural.`,
           "Ask permission for any adjustment; pause when anyone is uncomfortable.",
           ...(poseReference?.posingNotes.length
             ? [poseReference.posingNotes[i % poseReference.posingNotes.length]]

@@ -1,4 +1,5 @@
 "use client";
+import { OutfitVisual } from "./outfit-visual";
 import { useEffect, useState } from "react";
 import { ShootNav } from "./shoot-nav";
 import { ReferencePanel } from "./reference-panel";
@@ -13,13 +14,16 @@ type View = {
   latest: Styling | null;
   versions: Styling[];
   stale: boolean;
+  sourcesAvailable?: boolean;
   subjects: { id: string; label: string }[];
 };
 export function StylingStudio({
   shootId,
   mode,
+  standalone = false,
 }: {
   shootId: string;
+  standalone?: boolean;
   mode: "lighting" | "wardrobe";
 }) {
   const [data, setData] = useState<View | null>(null);
@@ -29,6 +33,7 @@ export function StylingStudio({
     "CONTEXT",
   );
   const [fill, setFill] = useState(false);
+  const [knowledgeOnly, setKnowledgeOnly] = useState(false);
   const [hero, setHero] = useState("");
   const [sceneText, setSceneText] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -40,6 +45,7 @@ export function StylingStudio({
       .then((v) => {
         if (active) {
           setData(v);
+          setKnowledgeOnly(v.latest?.wardrobe?.knowledgeOnly ?? false);
           setHero(v.latest?.wardrobe?.heroSubjectId ?? "");
           if (v.latest?.lighting) {
             setRecipe(v.latest.lighting.recipe);
@@ -114,21 +120,43 @@ export function StylingStudio({
   };
   return (
     <section className="container">
-      <ShootNav shootId={shootId} />
+      {!standalone && <ShootNav shootId={shootId} />}
       <h1>{mode === "lighting" ? "Lighting Lab" : "Wardrobe Stylist"}</h1>
       <p>
         {mode === "lighting"
           ? "Original schematics and unmetered starting settings. Verify on location."
           : "Three considered looks per person. Review your photo’s visible proportions and colors, or start with personal preferences. You make the final choice."}
       </p>
-      <ReferencePanel
-        shootId={shootId}
-        onApproved={() => {
-          api<View>(`shoots/${shootId}/styling`)
-            .then(setData)
-            .catch((e) => setError(e.message));
-        }}
-      />
+      {mode === "wardrobe" && (
+        <section className="panel">
+          <h2>From the knowledge library — no image needed</h2>
+          <p>
+            Use reviewed wardrobe and composition principles from the supplied
+            portrait books with your stated preferences. No skin or body
+            assumptions are made. Attached image observations and photo-derived
+            outfit locks are excluded in this mode.
+          </p>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={knowledgeOnly}
+              onChange={(e) => setKnowledgeOnly(e.target.checked)}
+            />
+            Use knowledge only, without reference images
+          </label>
+        </section>
+      )}
+      {!(mode === "wardrobe" && knowledgeOnly) && (
+        <ReferencePanel
+          scope={mode === "lighting" ? "LIGHTING" : "WARDROBE"}
+          shootId={shootId}
+          onApproved={() => {
+            api<View>(`shoots/${shootId}/styling`)
+              .then(setData)
+              .catch((e) => setError(e.message));
+          }}
+        />
+      )}
       {error && (
         <div role="alert">
           {error}{" "}
@@ -140,6 +168,23 @@ export function StylingStudio({
       {!data && !error && <p role="status">Loading private workspace…</p>}
       {data && (
         <>
+          {standalone && current && (
+            <p>
+              <a
+                className="button secondary"
+                href={`/api/v1/shoots/${shootId}/styling/export.json`}
+                download
+              >
+                Download current styling JSON
+              </a>
+            </p>
+          )}
+          {data.sourcesAvailable === false && (
+            <p role="alert">
+              A knowledge source is unavailable. Regenerate before sharing these
+              recommendations.
+            </p>
+          )}
           {data.stale && (
             <p role="status">
               Inputs changed. Regenerate affected sections; old versions retain
@@ -389,6 +434,7 @@ export function StylingStudio({
                   onClick={() =>
                     act({
                       action: "WARDROBE",
+                      knowledgeOnly,
                       ...(hero ? { heroSubjectId: hero } : {}),
                     })
                   }
@@ -404,6 +450,25 @@ export function StylingStudio({
                 {wardrobe && (
                   <>
                     <h2>Coordinated palette</h2>
+                    {wardrobe.knowledgeOnly && (
+                      <p className="quality-note">
+                        Knowledge-only output: no photo observations used.
+                      </p>
+                    )}
+                    {!!wardrobe.sourceNotes?.length && (
+                      <details>
+                        <summary>
+                          Knowledge sources ({wardrobe.sourceNotes.length})
+                        </summary>
+                        {wardrobe.sourceNotes.map((note) => (
+                          <p className="hint" key={note.reference.chunkId}>
+                            {note.summary} · {note.reference.documentTitle} ·
+                            PDF page {note.reference.pageStart} · review{" "}
+                            {note.reference.chunkRevision}
+                          </p>
+                        ))}
+                      </details>
+                    )}
                     <div
                       className="palette-strip"
                       aria-label="Coordinated wardrobe colors"
@@ -457,6 +522,7 @@ export function StylingStudio({
                           {look.candidates.map((c) => (
                             <article className="card" key={c.id}>
                               <h3>{c.name}</h3>
+                              <OutfitVisual colors={c.color} label={c.name} />
                               <p>
                                 {c.color} ·{" "}
                                 {look.selectedId === c.id

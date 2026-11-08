@@ -1,3 +1,7 @@
+import {
+  completePlanSnapshot,
+  completePlanInputs,
+} from "./complete-plan-service";
 import { z } from "zod";
 import { generationSchema, sectionSchema } from "@framecraft/shared/planning";
 import {
@@ -159,6 +163,43 @@ export async function knowledgeRoutes(
       );
     }
   }
+  if (
+    root === "shoots" &&
+    id &&
+    section === "complete-plan" &&
+    p.length === 3
+  ) {
+    if (method === "GET") return http.ok(await completePlanSnapshot(owner, id));
+    if (method === "POST") {
+      const body = generationSchema.parse(await http.readJson(request));
+      if (body.knowledgeOnly)
+        throw new InputError(
+          "USE_INDIVIDUAL_TOOL",
+          "Choose knowledge-only mode inside Posing guide or Wardrobe Stylist.",
+          422,
+        );
+      const snapshot = await completePlanInputs(owner, id);
+      return http.ok(
+        publicJob(
+          await enqueue(
+            owner,
+            "PLAN",
+            body.idempotencyKey,
+            {
+              poseCount: body.poseCount,
+              useKnowledgeBase: body.useKnowledgeBase,
+              knowledgeOnly: body.knowledgeOnly,
+              referenceScope: body.referenceScope,
+              complete: true,
+              ...snapshot,
+            },
+            id,
+          ),
+        ),
+        202,
+      );
+    }
+  }
   if (root === "shoots" && id && section === "plans") {
     if (p.length === 3 && method === "GET")
       return http.ok(await listPlans(owner, id));
@@ -174,6 +215,8 @@ export async function knowledgeRoutes(
             {
               poseCount: body.poseCount,
               useKnowledgeBase: body.useKnowledgeBase,
+              knowledgeOnly: body.knowledgeOnly,
+              referenceScope: body.referenceScope,
             },
             id,
           ),

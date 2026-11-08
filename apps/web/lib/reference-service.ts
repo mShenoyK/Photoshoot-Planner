@@ -8,6 +8,7 @@ import {
   requiresGuardian,
   type InputState,
   type MediaAsset,
+  type ReferenceScope,
 } from "@framecraft/shared/inputs";
 import { referenceVision, type ReferenceVisionProvider } from "@framecraft/ai";
 import { withShoot, InputError } from "./input-repository";
@@ -44,11 +45,20 @@ export function analysisPermission(s: InputState, a: MediaAsset) {
       );
   }
 }
-export function approvedReferences(s: InputState): ReferenceReview[] {
+export function scopedInputs(s: InputState, scope: ReferenceScope): InputState {
+  return {
+    ...s,
+    media: s.media.filter((a) => (a.workflowScope ?? "PLAN") === scope),
+  };
+}
+export function approvedReferences(
+  s: InputState,
+  scope?: ReferenceScope,
+): ReferenceReview[] {
   return (s.referenceReviews ?? []).filter((r) => {
     if (!r.approved) return false;
     const a = s.media.find((a) => a.id === r.assetId);
-    if (!a) return false;
+    if (!a || (scope && (a.workflowScope ?? "PLAN") !== scope)) return false;
     try {
       analysisPermission(s, a);
       return a.subjectIds.every((id) => r.consentIds[id] === a.consentIds[id]);
@@ -116,6 +126,8 @@ export async function analyzeReference(
           adapter.analyze({
             image,
             kind: asset.kind,
+            referenceView: asset.referenceView,
+            workflowScope: asset.workflowScope,
             subjectCount: asset.subjectIds.length,
             preferences: person
               ? {
@@ -167,9 +179,12 @@ export async function analyzeReference(
     } finally {
       clearTimeout(timer);
     }
-    if (asset.kind !== "SUBJECT_PHOTO" || asset.subjectIds.length !== 1)
+    if (asset.kind !== "SUBJECT_PHOTO" || asset.subjectIds.length !== 1) {
+      analysis.skinColorObservation =
+        "Not attributed from a group, pose or scene reference.";
       analysis.visibleProportions =
         "Individual body proportions are not attributed from a group/scene image. Add an individual reference or enter fit preferences manually.";
+    }
     const review: ReferenceReview = {
       id: randomUUID(),
       assetId,

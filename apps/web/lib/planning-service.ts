@@ -1,3 +1,4 @@
+import { ensureBuiltinKnowledge } from "./builtin-knowledge";
 import { approvedReferences } from "./reference-service";
 import { randomUUID } from "node:crypto";
 import {
@@ -150,6 +151,8 @@ async function plannerInput(
   owner: string,
   shootId: string,
   poseCount: number,
+  knowledgeOnly = false,
+  referenceScope: "PLAN" | "POSES" = "PLAN",
 ): Promise<Omit<PlannerInput, "context">> {
   return withShoot(owner, shootId, (state, shoot) => {
     const count = state.subjects.length;
@@ -172,7 +175,13 @@ async function plannerInput(
         consentHistory: [],
       })) as Subject[],
       equipment: state.cameraKit,
-      referenceInsights: approvedReferences(state).map((r) => ({
+      referenceInsights: (knowledgeOnly
+        ? []
+        : approvedReferences(
+            state,
+            shoot.workflowKind === "POSES" ? "POSES" : referenceScope,
+          )
+      ).map((r) => ({
         ...r.analysis,
         referenceKind: state.media.find((a) => a.id === r.assetId)?.kind,
       })),
@@ -189,6 +198,8 @@ export async function generatePlan(
   options: {
     poseCount: number;
     useKnowledgeBase: boolean;
+    knowledgeOnly?: boolean;
+    referenceScope?: "PLAN" | "POSES";
     baseVersion?: number;
     section?: string;
   },
@@ -198,8 +209,22 @@ export async function generatePlan(
     state.plans?.find((p) => p.jobId === jobId),
   );
   if (previous) return { planId: previous.id, version: previous.version };
+  if (options.section) {
+    const base = (await listPlans(owner, shootId)).at(-1);
+    if (base?.referenceScope)
+      options = { ...options, referenceScope: base.referenceScope };
+    if (base?.knowledgeOnly)
+      options = { ...options, knowledgeOnly: true, useKnowledgeBase: true };
+  }
+  if (options.knowledgeOnly) await ensureBuiltinKnowledge(owner);
   const activeProvider = provider ?? textPlanner();
-  const input = await plannerInput(owner, shootId, options.poseCount);
+  const input = await plannerInput(
+    owner,
+    shootId,
+    options.poseCount,
+    options.knowledgeOnly,
+    options.referenceScope,
+  );
   let context: KnowledgeHit[] = [];
   try {
     if (options.useKnowledgeBase)
@@ -231,6 +256,11 @@ export async function generatePlan(
       }),
     ]);
     const generated = planSchema.parse(value);
+    generated.knowledgeOnly = options.knowledgeOnly === true;
+    generated.referenceScope =
+      input.shoot.workflowKind === "POSES"
+        ? "POSES"
+        : (options.referenceScope ?? "PLAN");
     if (Buffer.byteLength(JSON.stringify(generated)) > 128 * 1024)
       throw new InputError("PLAN_SIZE", "Planner output is too large.");
     const old = options.section

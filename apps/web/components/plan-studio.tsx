@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { CompletePlanPanel } from "./complete-plan-panel";
 import { PoseSchematic } from "./pose-schematic";
 import { ShootNav } from "./shoot-nav";
 import { ReferencePanel } from "./reference-panel";
@@ -11,21 +12,25 @@ type Plan = ShootPlan & { citationStatus: "VALID" | "SOURCE_UNAVAILABLE" };
 export function PlanStudio({
   shootId,
   poseStudio = false,
+  standalone = false,
 }: {
   shootId: string;
   poseStudio?: boolean;
+  standalone?: boolean;
 }) {
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [draft, setDraft] = useState<Plan | null>(null);
   const [job, setJob] = useState<TaskJob | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [refresh, setRefresh] = useState(0);
   const [useKnowledge, setKnowledge] = useState(true);
   const [query, setQuery] = useState("");
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const load = async () => {
     const data = await api<Plan[]>(`shoots/${shootId}/plans`);
     setPlans(data);
+    setRefresh((v) => v + 1);
     setDraft(data.at(-1) ?? null);
     setDirty(new Set());
   };
@@ -150,44 +155,54 @@ export function PlanStudio({
       />
     );
   }
-  async function generate() {
+  async function generate(complete = false, knowledgeOnly = false) {
     await action(async () => {
       await receiveJob(
-        await api<TaskJob>(`shoots/${shootId}/plans`, "POST", {
-          poseCount: 6,
-          useKnowledgeBase: useKnowledge,
-          idempotencyKey: crypto.randomUUID(),
-        }),
+        await api<TaskJob>(
+          `shoots/${shootId}/${complete ? "complete-plan" : "plans"}`,
+          "POST",
+          {
+            poseCount: 6,
+            useKnowledgeBase: knowledgeOnly || useKnowledge,
+            knowledgeOnly,
+            referenceScope: poseStudio ? "POSES" : "PLAN",
+            idempotencyKey: crypto.randomUUID(),
+          },
+        ),
       );
     });
   }
   return (
     <>
-      <Link className="hint" href={"/shoots/" + shootId}>
-        ← Shoot brief
-      </Link>
-      <ShootNav shootId={shootId} />
+      {!standalone && (
+        <Link className="hint" href={"/shoots/" + shootId}>
+          ← Shoot brief
+        </Link>
+      )}
+      {!standalone && <ShootNav shootId={shootId} />}
       <div className="hero">
         <div>
           <p className="eyebrow">Creative direction, with a record</p>
           <h1>{poseStudio ? "Pose Studio." : "A plan you can shape."}</h1>
           <p>
-            Your creative brief, posing guide and shot list in one place.
-            Confirm reference observations, then generate or refine your shoot
-            plan.
+            {standalone
+              ? "Generate, edit and save posing directions for this independent session. No photoshoot plan is required."
+              : "Your creative brief, posing guide and shot list in one place. Confirm reference observations, then generate or refine your shoot plan."}
           </p>
         </div>
-        <Link
-          className="button secondary"
-          href={`/shoots/${shootId}/${poseStudio ? "plan" : "poses"}`}
-        >
-          {poseStudio ? "Full plan" : "Open Pose Studio"}
-        </Link>
+        {!standalone && (
+          <Link
+            className="button secondary"
+            href={`/shoots/${shootId}/${poseStudio ? "plan" : "poses"}`}
+          >
+            {poseStudio ? "Full plan" : "Open Pose Studio"}
+          </Link>
+        )}
       </div>
       <a className="button secondary" href="#posing-guide">
         Jump to posing guide
       </a>
-      <ReferencePanel shootId={shootId} />
+      <ReferencePanel shootId={shootId} scope={poseStudio ? "POSES" : "PLAN"} />
       {error && (
         <p role="alert" className="error">
           {error}
@@ -195,11 +210,16 @@ export function PlanStudio({
       )}
       <section className="banner">
         <div>
-          <h3>Generate from your brief and manual profiles</h3>
+          <h3>
+            {standalone
+              ? "Generate from this session and manual profiles"
+              : "Generate from your brief and manual profiles"}
+          </h3>
           <p>
-            No subject photographs are read. Uncited recommendations are labeled
-            generated guidance. Source principles use only approved,
-            rights-permitted private knowledge.
+            Confirmed reference observations guide generation; raw photos are
+            analyzed only by your explicit consent and request. Uncited
+            recommendations are labeled generated guidance. Source principles
+            use only approved, rights-permitted private knowledge.
           </p>
           <label className="check">
             <input
@@ -209,6 +229,14 @@ export function PlanStudio({
             />{" "}
             Retrieve approved private knowledge
           </label>
+          {!poseStudio && (
+            <button
+              disabled={busy || !!dirty.size || jobActive}
+              onClick={() => void generate(true)}
+            >
+              Generate complete shoot plan
+            </button>
+          )}
           <button
             disabled={
               busy ||
@@ -217,10 +245,27 @@ export function PlanStudio({
             }
             onClick={() => void generate()}
           >
-            Generate plan
+            {standalone ? "Generate posing guide" : "Generate plan"}
           </button>
         </div>
       </section>
+      {poseStudio && (
+        <section className="panel">
+          <h2>From the knowledge library — no image needed</h2>
+          <p>
+            Generate original pose directions using reviewed PDF notes, your
+            scene and stated people profiles. Attached images and their
+            observations are excluded. Books are sources of principles, not
+            illustrations to copy.
+          </p>
+          <button
+            disabled={busy || !!dirty.size || jobActive}
+            onClick={() => void generate(false, true)}
+          >
+            Recommend poses from knowledge
+          </button>
+        </section>
+      )}
       {job && (
         <section className="panel">
           <p role="status">
@@ -253,8 +298,15 @@ export function PlanStudio({
           )}
         </section>
       )}
+      {!poseStudio && (
+        <CompletePlanPanel
+          shootId={shootId}
+          planId={draft?.id}
+          refresh={refresh}
+        />
+      )}
       {plans === null ? (
-        <p role="status">Loading plan versions…</p>
+        <p role="status">Loading saved versions…</p>
       ) : !draft ? (
         <section className="panel empty">
           <h2>Your brief is ready for direction.</h2>
@@ -262,9 +314,11 @@ export function PlanStudio({
             Generate a plan to see a creative brief, exact-person pose cards and
             a prioritized shot list.
           </p>
-          <Link href={`/shoots/${shootId}/subjects`}>
-            Review people & equipment first
-          </Link>
+          {!standalone && (
+            <Link href={`/shoots/${shootId}/subjects`}>
+              Review people & equipment first
+            </Link>
+          )}
         </section>
       ) : (
         <>
@@ -303,6 +357,12 @@ export function PlanStudio({
               </select>
             </div>
           </div>
+          {draft.knowledgeOnly && (
+            <p className="quality-note">
+              Knowledge-only guide: reference image observations were excluded.
+              Section regeneration keeps this mode.
+            </p>
+          )}
           {!latest && (
             <p className="quality-note">
               Historical version: read-only. Select the latest version to edit
@@ -438,7 +498,13 @@ export function PlanStudio({
                 visual guides and comfort checks.
               </p>
               <h3>Pose cards</h3>
-              <Link href={`/shoots/${shootId}/files`}>
+              <Link
+                href={
+                  standalone
+                    ? `/tools/poses/${shootId}/files`
+                    : `/shoots/${shootId}/files`
+                }
+              >
                 Original illustrations & exports
               </Link>
               <input
