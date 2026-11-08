@@ -1,3 +1,4 @@
+import { visualRoutes } from "./visual-routes";
 import { workflowRoutes } from "./workflow-routes";
 import { referenceRoutes } from "./reference-routes";
 import { applicationOrigin } from "./application-origin";
@@ -141,6 +142,11 @@ async function handleRequest(request: Request) {
     }
     const owner = await identity(request);
     if (!owner) return error("UNAUTHORIZED", "Sign in to continue.", 401);
+    const visual = await visualRoutes(request, parts, owner, {
+      ok: response,
+      readJson,
+    });
+    if (visual) return visual;
     const workflow = await workflowRoutes(request, parts, owner, {
       ok: response,
       readJson,
@@ -237,6 +243,38 @@ async function handleRequest(request: Request) {
         "CONFLICT",
         "This shoot changed elsewhere. Reopen it before editing.",
         409,
+      );
+    if (
+      e instanceof Error &&
+      [
+        "OPENAI_NOT_CONFIGURED",
+        "LIVE_PROVIDER_REQUIRED",
+        "TEXT_PROVIDER_NOT_CONFIGURED",
+      ].includes(e.message)
+    )
+      return error(
+        e.message,
+        "Configure OPENAI_API_KEY securely and set AI_TEXT_PROVIDER, AI_VISION_PROVIDER and AI_IMAGE_PROVIDER to openai. No sample recommendation was substituted.",
+        503,
+      );
+    if (
+      e instanceof Error &&
+      [
+        "PROVIDER_AUTH",
+        "PROVIDER_RATE_LIMIT",
+        "PROVIDER_FAILED",
+        "PROVIDER_SIZE",
+        "PROVIDER_EMPTY",
+        "PROVIDER_RESPONSE",
+        "WARDROBE_PREFERENCE_CONFLICT",
+      ].includes(e.message)
+    )
+      return error(
+        e.message,
+        e.message === "WARDROBE_PREFERENCE_CONFLICT"
+          ? "The generated outfit conflicted with stated avoided colors. Nothing was saved; retry or adjust preferences."
+          : "The AI provider could not complete this request. Check server credentials, model access and quota, then retry. Saved guidance is retained.",
+        e.message === "WARDROBE_PREFERENCE_CONFLICT" ? 422 : 502,
       );
     if (e instanceof SyntaxError)
       return error("INVALID_JSON", "Invalid JSON request.", 400);

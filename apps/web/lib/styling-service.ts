@@ -1,3 +1,4 @@
+import { refineWardrobe } from "@framecraft/ai";
 import { ensureBuiltinKnowledge } from "./builtin-knowledge";
 import {
   takeKnowledgeLease,
@@ -83,7 +84,7 @@ export async function changeStyling(owner: string, id: string, body: unknown) {
     });
   }
   try {
-    return await withShoot(owner, id, (state, shoot) => {
+    return await withShoot(owner, id, async (state, shoot) => {
       state.styling ??= [];
       const old = state.styling.at(-1);
       if ((old?.revision ?? 0) !== action.baseRevision)
@@ -194,6 +195,11 @@ export async function changeStyling(owner: string, id: string, body: unknown) {
               ? "Use the reviewed coordination principles below to choose a setting, discuss formality and include footwear when framing full length. Palette and fit choices remain suggestions to confirm with each participant."
               : "No eligible wardrobe sources are available; these are uncited manual-profile suggestions.");
         }
+        next.wardrobe = await refineWardrobe({
+          shoot,
+          subjects: state.subjects,
+          wardrobe: next.wardrobe,
+        });
         next.wardrobeInputHash = stylingInputHash(
           state,
           shoot,

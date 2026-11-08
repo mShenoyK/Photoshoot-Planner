@@ -78,6 +78,19 @@ async function discard(state: InputState, subjectId?: string) {
     if (matches(intent.subjectIds)) intent.status = "INVALID";
   const removed = state.media.filter((a) => matches(a.subjectIds));
   state.media = state.media.filter((a) => !matches(a.subjectIds));
+  const removedReviewIds = (state.referenceReviews ?? [])
+    .filter((r) => removed.some((a) => a.id === r.assetId))
+    .map((r) => r.id);
+  const removedVisuals = (state.visuals ?? []).filter(
+    (v) =>
+      v.referenceIds.some((id) => removedReviewIds.includes(id)) ||
+      (v.sourceAssetIds ?? []).some((id) =>
+        removed.some((asset) => asset.id === id),
+      ),
+  );
+  state.visuals = (state.visuals ?? []).filter(
+    (v) => !removedVisuals.some((gone) => gone.id === v.id),
+  );
   state.referenceReviews = (state.referenceReviews ?? []).filter(
     (r) => !removed.some((a) => a.id === r.assetId),
   );
@@ -85,6 +98,7 @@ async function discard(state: InputState, subjectId?: string) {
     ...new Set([
       ...(state.pendingDeletionKeys ?? []),
       ...removed.flatMap((a) => [a.originalKey, a.derivativeKey]),
+      ...removedVisuals.map((v) => v.storageKey),
     ]),
   ];
   await flushDeletion(state);
@@ -465,8 +479,10 @@ export const inputs = {
         state.pendingDeletionKeys = [
           ...(state.pendingDeletionKeys ?? []),
           ...(state.artifacts ?? []).map((a) => a.storageKey),
+          ...(state.visuals ?? []).map((a) => a.storageKey),
         ];
         state.artifacts = [];
+        state.visuals = [];
         await discard(state);
         state.subjects = [];
         state.intents = [];

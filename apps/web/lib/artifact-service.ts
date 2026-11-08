@@ -1,3 +1,5 @@
+import sharp from "sharp";
+import { downloadVisual } from "./visual-service";
 import { randomUUID } from "node:crypto";
 import {
   artifactRequestSchema,
@@ -86,6 +88,14 @@ export async function createArtifact(
         ageGroup: p.ageGroup,
         ...(p.ageYears !== undefined ? { ageYears: p.ageYears } : {}),
       })),
+      visualIds: (s.visuals ?? [])
+        .filter(
+          (v) =>
+            (v.target.kind === "POSE" && v.target.planId === plan.id) ||
+            (v.target.kind !== "POSE" &&
+              v.target.stylingRevision === req.stylingRevision),
+        )
+        .map((v) => v.id),
       illustrations: (s.artifacts ?? []).filter(
         (a) => a.planId === plan.id && a.format === "ILLUSTRATION",
       ),
@@ -189,6 +199,22 @@ export async function createArtifact(
           sha256: a.sha256,
         });
       }
+      const generatedImages = [];
+      if (req.format === "ZIP")
+        for (const visualId of snapshot.visualIds ?? []) {
+          const image = await downloadVisual(owner, id, visualId);
+          const jpeg = await sharp(image.bytes)
+            .jpeg({ quality: 82 })
+            .toBuffer();
+          const fileName = `${image.record.target.kind.toLowerCase()}-${image.record.id}.jpg`;
+          illustrations.push({ fileName, bytes: jpeg, sha256: digest(jpeg) });
+          generatedImages.push({
+            fileName,
+            provider: image.record.provider,
+            target: image.record.target,
+            review: image.record.review,
+          });
+        }
       if (req.format === "SVG" && !snapshot.styling?.lighting)
         throw new InputError(
           "LIGHTING_REQUIRED",
@@ -201,6 +227,7 @@ export async function createArtifact(
           title: snapshot.title!,
           createdAt: job.createdAt,
           illustrations,
+          generatedImages,
         },
         req.format,
       );

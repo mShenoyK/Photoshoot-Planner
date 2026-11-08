@@ -1,3 +1,4 @@
+import { refineWardrobe } from "@framecraft/ai";
 import { stylingSchema } from "@framecraft/shared/styling";
 import { withShoot, InputError } from "./input-repository";
 import { stylingInputHash } from "./styling-service";
@@ -40,7 +41,7 @@ export async function generateCompletePlan(
     poseCount: Number(input.poseCount),
     useKnowledgeBase: input.useKnowledgeBase === true,
   });
-  return withShoot(owner, id, (state, shoot) => {
+  return withShoot(owner, id, async (state, shoot) => {
     const existing = state.completePlans?.find((p) => p.jobId === jobId);
     if (existing) return { ...existing };
     const hash = stylingInputHash(state, shoot);
@@ -59,6 +60,11 @@ export async function generateCompletePlan(
         old?.wardrobe,
         old?.wardrobe?.heroSubjectId,
       ),
+    });
+    styling.wardrobe = await refineWardrobe({
+      shoot,
+      subjects: state.subjects,
+      wardrobe: styling.wardrobe!,
     });
     const record = {
       jobId,

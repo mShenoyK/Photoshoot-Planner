@@ -1,3 +1,4 @@
+import { liveProviderMode } from "./openai-http";
 import {
   illustrationSceneSchema,
   type IllustrationScene,
@@ -44,7 +45,7 @@ export class SchematicIllustrator implements PoseIllustrationProvider {
   }
 }
 export function poseIllustrator(): PoseIllustrationProvider {
-  if ((process.env.AI_IMAGE_PROVIDER ?? "mock") !== "mock")
+  if (liveProviderMode("AI_IMAGE_PROVIDER") !== "mock")
     throw new Error("IMAGE_PROVIDER_NOT_CONFIGURED");
   return new SchematicIllustrator();
 }

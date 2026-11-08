@@ -289,6 +289,8 @@ function photoLookAllowed(look: Wardrobe["looks"][number], state: InputState) {
     ids.every((id) => {
       const asset = state.media.find((a) => a.id === id);
       if (!asset) return false;
+      if (!approvedReferences(state).some((r) => r.assetId === id))
+        return false;
       try {
         analysisPermission(state, asset);
         return true;

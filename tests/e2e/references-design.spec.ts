@@ -161,14 +161,18 @@ for (const width of [375, 1440])
     await expect(
       page.getByRole("heading", { name: "Posing guide", exact: true }),
     ).toBeVisible();
-    await expect(page.locator("[data-pose-subject]")).toHaveCount(24);
+    await expect(page.locator(".pose-card .recommendation-visual")).toHaveCount(
+      6,
+    );
     await expect(
       page.getByRole("heading", { name: "Lighting setup", exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Wardrobe looks", exact: true }),
     ).toBeVisible();
-    await expect(page.locator(".outfit-visual")).toHaveCount(12);
+    await expect(
+      page.locator(".outfit-reference .recommendation-visual"),
+    ).toHaveCount(12);
     await expect(
       page.getByText(/This bundle used 3 reviewed references/),
     ).toBeVisible();

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useId } from "react";
 import { requiresGuardian, type Subject } from "@framecraft/shared/inputs";
 import { api } from "./client";
 export function ConsentForm({
@@ -11,6 +11,7 @@ export function ConsentForm({
   subject: Subject;
   onChanged: () => void;
 }) {
+  const inputId = useId();
   const [guardianName, setName] = useState("");
   const [guardianRelationship, setRelation] = useState("");
   const [ack, setAck] = useState(false);
@@ -89,20 +90,22 @@ export function ConsentForm({
             A guardian is required for a minor or an unconfirmed age.
           </p>
           <div className="field">
-            <label htmlFor={"guardian-" + subject.id}>Guardian name</label>
+            <label htmlFor={"guardian-" + inputId + subject.id}>
+              Guardian name
+            </label>
             <input
-              id={"guardian-" + subject.id}
+              id={"guardian-" + inputId + subject.id}
               maxLength={120}
               value={guardianName}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
           <div className="field">
-            <label htmlFor={"relationship-" + subject.id}>
+            <label htmlFor={"relationship-" + inputId + subject.id}>
               Guardian relationship
             </label>
             <input
-              id={"relationship-" + subject.id}
+              id={"relationship-" + inputId + subject.id}
               maxLength={120}
               value={guardianRelationship}
               onChange={(e) => setRelation(e.target.value)}
@@ -142,7 +145,9 @@ export function ConsentForm({
           checked={generation}
           onChange={(e) => setGeneration(e.target.checked)}
         />{" "}
-        Permit future personalized image generation (currently unavailable).
+        Permit image generation guided by approved reference observations.
+        Generated people are fictional; original photos are not sent to the
+        image generator.
       </label>
       {error && (
         <p role="alert" className="error">

@@ -1,3 +1,4 @@
+import { createRecommendationVisual } from "./visual-service";
 import { generateCompletePlan } from "./complete-plan-service";
 import { createArtifact } from "./artifact-service";
 import { randomUUID } from "node:crypto";
@@ -178,6 +179,8 @@ export async function runTask(owner: string, id: string) {
       );
     else if (claimed.kind === "EMBED")
       result = await embedDocument(owner, String(claimed.input.documentId));
+    else if (claimed.kind === "VISUAL")
+      result = await createRecommendationVisual(owner, claimed);
     else if (claimed.kind === "ILLUSTRATE" || claimed.kind === "EXPORT")
       result = await createArtifact(owner, claimed);
     else {
@@ -231,6 +234,19 @@ export async function runTask(owner: string, id: string) {
         : error instanceof Error &&
             [
               "TEXT_PROVIDER_NOT_CONFIGURED",
+              "OPENAI_NOT_CONFIGURED",
+              "LIVE_PROVIDER_REQUIRED",
+              "LIVE_IMAGE_REQUIRED",
+              "PROVIDER_AUTH",
+              "PROVIDER_RATE_LIMIT",
+              "PROVIDER_FAILED",
+              "PROVIDER_SIZE",
+              "PROVIDER_EMPTY",
+              "PROVIDER_RESPONSE",
+              "IMAGE_RESPONSE",
+              "IMAGE_PROMPT_SIZE",
+              "IMAGE_REVIEW_FAILED",
+              "WARDROBE_PREFERENCE_CONFLICT",
               "IMAGE_PROVIDER_NOT_CONFIGURED",
               "EXPORT_INPUT_LIMIT",
               "EXPORT_PAGE_LIMIT",

@@ -1,3 +1,4 @@
+import { liveProviderMode } from "./openai-http";
 import {
   referenceAnalysisSchema,
   type ReferenceAnalysis,
@@ -146,7 +147,7 @@ export class OpenAIReferenceVision implements ReferenceVisionProvider {
   }
 }
 export function referenceVision(): ReferenceVisionProvider {
-  const mode = process.env.AI_VISION_PROVIDER ?? "mock";
+  const mode = liveProviderMode("AI_VISION_PROVIDER");
   if (mode === "mock") return new MockReferenceVision();
   if (mode !== "openai") throw new Error("VISION_NOT_CONFIGURED");
   const key = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;

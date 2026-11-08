@@ -199,6 +199,7 @@ export type CompletePlanRecord = {
   referenceIds: string[];
 };
 export type InputState = {
+  visuals?: import("./visuals").RecommendationVisual[];
   completePlans?: CompletePlanRecord[];
   referenceReviews?: import("./references").ReferenceReview[];
   artifacts?: import("./artifacts").Artifact[];

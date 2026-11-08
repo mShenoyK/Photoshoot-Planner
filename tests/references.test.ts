@@ -52,7 +52,11 @@ afterEach(() => {
 afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
-async function fixture(allowAnalysis = true, minor = false) {
+async function fixture(
+  allowAnalysis = true,
+  minor = false,
+  allowGeneration = false,
+) {
   const shoot = (await store.save(owner, {
     ...defaults,
     name: "Photo-led portrait",
@@ -69,6 +73,7 @@ async function fixture(allowAnalysis = true, minor = false) {
     acknowledged: true,
     confirmedAuthority: true,
     allowAnalysis,
+    allowGeneration,
     ...(minor
       ? { guardianName: "Guardian", guardianRelationship: "Parent" }
       : {}),
@@ -582,4 +587,166 @@ it("uses posing-scoped references in the posing tool inside a shoot, without lea
   });
   plan = (await listPlans(owner, f.shoot.id)).at(-1)!;
   expect(JSON.stringify(plan)).not.toContain(a.sceneSummary);
+});
+
+it("requires separate generation permission before photo-guided image providers are invoked", async () => {
+  const { createRecommendationVisual } =
+    await import("../apps/web/lib/visual-service");
+  const f = await fixture();
+  const r = await analyzeReference(owner, f.shoot.id, f.asset.id, {
+    name: "test-vision",
+    analyze: observed,
+  });
+  await approveReference(owner, f.shoot.id, r.id, {
+    analysis: r.analysis,
+    approved: true,
+  });
+  const style = await changeStyling(owner, f.shoot.id, {
+    action: "WARDROBE",
+    baseRevision: 0,
+  });
+  const look = style.latest!.wardrobe!.looks[0];
+  const generate = vi.fn(async () => {
+    throw new Error("must not call provider");
+  });
+  await expect(
+    createRecommendationVisual(
+      owner,
+      {
+        id: randomUUID(),
+        ownerId: owner,
+        shootId: f.shoot.id,
+        kind: "VISUAL",
+        status: "RUNNING",
+        attempts: 1,
+        progress: 0,
+        input: {
+          target: {
+            kind: "WARDROBE",
+            stylingRevision: 1,
+            subjectId: look.subjectId,
+            candidateId: look.selectedId,
+          },
+        },
+        idempotencyKey: randomUUID(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      { name: "uninvoked", generate },
+    ),
+  ).rejects.toMatchObject({ code: "GENERATION_CONSENT_REQUIRED" });
+  expect(generate).not.toHaveBeenCalled();
+});
+
+it("deletes reference-guided images on consent revocation even after the photo has been re-reviewed", async () => {
+  const { createRecommendationVisual, listVisuals } =
+    await import("../apps/web/lib/visual-service");
+  const f = await fixture(true, false, true);
+  let r = await analyzeReference(owner, f.shoot.id, f.asset.id, {
+    name: "test-vision",
+    analyze: observed,
+  });
+  await approveReference(owner, f.shoot.id, r.id, {
+    analysis: r.analysis,
+    approved: true,
+  });
+  const style = await changeStyling(owner, f.shoot.id, {
+    action: "WARDROBE",
+    baseRevision: 0,
+  });
+  const look = style.latest!.wardrobe!.looks[0];
+  const png = await sharp({
+    create: { width: 512, height: 512, channels: 3, background: "#6688aa" },
+  })
+    .png()
+    .toBuffer();
+  await createRecommendationVisual(
+    owner,
+    {
+      id: randomUUID(),
+      ownerId: owner,
+      shootId: f.shoot.id,
+      kind: "VISUAL",
+      status: "RUNNING",
+      attempts: 1,
+      progress: 0,
+      input: {
+        target: {
+          kind: "WARDROBE",
+          stylingRevision: 1,
+          subjectId: look.subjectId,
+          candidateId: look.selectedId,
+        },
+      },
+      idempotencyKey: randomUUID(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      name: "fixture-image",
+      generate: async () => ({
+        bytes: png,
+        review: {
+          subjectCount: 1,
+          ageBandsMatch: true,
+          safeSupportedPose: true,
+          matchesRequestedScene: true,
+          matchesRequestedOutfit: true,
+          notes: "Synthetic test fixture",
+        },
+      }),
+    },
+  );
+  expect(await listVisuals(owner, f.shoot.id)).toHaveLength(1);
+  r = await analyzeReference(owner, f.shoot.id, f.asset.id, {
+    name: "test-vision",
+    analyze: observed,
+  });
+  await approveReference(owner, f.shoot.id, r.id, {
+    analysis: r.analysis,
+    approved: true,
+  });
+  const remove = vi.spyOn(LocalObjectStore.prototype, "remove");
+  await inputs.consent(owner, f.shoot.id, f.subject.id, { status: "REVOKED" });
+  expect(await listVisuals(owner, f.shoot.id)).toHaveLength(0);
+  expect(
+    remove.mock.calls.some(([key]) => key.endsWith("recommendation.png")),
+  ).toBe(true);
+});
+
+it("drops photo-derived outfit locks after a reference is explicitly excluded", async () => {
+  const f = await fixture();
+  const r = await analyzeReference(owner, f.shoot.id, f.asset.id, {
+    name: "test-vision",
+    analyze: observed,
+  });
+  await approveReference(owner, f.shoot.id, r.id, {
+    analysis: r.analysis,
+    approved: true,
+  });
+  const initial = await changeStyling(owner, f.shoot.id, {
+    action: "WARDROBE",
+    baseRevision: 0,
+  });
+  const look = initial.latest!.wardrobe!.looks[0];
+  await changeStyling(owner, f.shoot.id, {
+    action: "SELECT",
+    baseRevision: 1,
+    subjectId: look.subjectId,
+    candidateId: look.selectedId,
+    locked: true,
+  });
+  await approveReference(owner, f.shoot.id, r.id, {
+    analysis: r.analysis,
+    approved: false,
+  });
+  const result = await changeStyling(owner, f.shoot.id, {
+    action: "WARDROBE",
+    baseRevision: 2,
+  });
+  expect(result.latest!.wardrobe!.looks[0].locked).toBe(false);
+  expect(result.latest!.wardrobe!.looks[0].sourceAssetId).toBeUndefined();
+  expect(JSON.stringify(result.latest!.wardrobe)).not.toContain(
+    r.analysis.visibleProportions,
+  );
 });

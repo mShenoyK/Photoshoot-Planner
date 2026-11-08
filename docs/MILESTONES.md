@@ -107,3 +107,12 @@ See PHASE_5_REPORT.md and DEPLOYMENT.md. Template/code readiness is not deployed
 - [x] Preserve the preceding complete-plan bundle implementation and its tests.
 - [ ] Import the oversized 100 Posing Ideas workbook when a transferable copy is available.
 - [ ] Verify live OpenAI, production S3, Render deployment and remote CI using configured accounts.
+
+## Private intake and live provider follow-up (FC-007, FC-012–FC-019)
+
+- [x] Enable the upload action on file selection; explain missing declarations/consent inline without processing the image.
+- [x] Add production OpenAI plan/outfit text and original recommendation-image adapters; block production mock fallback.
+- [x] Validate generated PNGs, independent image review, private versioned storage, generation-purpose consent, retries and cleanup.
+- [x] Show generated images in posing, lighting, wardrobe and Private Files; include generated JPEG copies/provenance in ZIP exports.
+- [x] Lint/typecheck/build, 116 service tests, full 29-test browser suite and 5 inline browser tests.
+- [ ] Configure the user's Render OpenAI key/provider flags, deploy and verify real model access, bucket access and visual output quality.

@@ -1,5 +1,5 @@
 "use client";
-import { OutfitVisual } from "./outfit-visual";
+import { GeneratedVisual } from "./generated-visual";
 import { useEffect, useState } from "react";
 import { ShootNav } from "./shoot-nav";
 import { ReferencePanel } from "./reference-panel";
@@ -33,6 +33,7 @@ export function StylingStudio({
     "CONTEXT",
   );
   const [fill, setFill] = useState(false);
+  const [autoRevision, setAutoRevision] = useState<number | null>(null);
   const [knowledgeOnly, setKnowledgeOnly] = useState(false);
   const [hero, setHero] = useState("");
   const [sceneText, setSceneText] = useState("");
@@ -45,6 +46,7 @@ export function StylingStudio({
       .then((v) => {
         if (active) {
           setData(v);
+
           setKnowledgeOnly(v.latest?.wardrobe?.knowledgeOnly ?? false);
           setHero(v.latest?.wardrobe?.heroSubjectId ?? "");
           if (v.latest?.lighting) {
@@ -108,6 +110,8 @@ export function StylingStudio({
         baseRevision: data?.latest?.revision ?? 0,
       });
       setData(v);
+      if (["LIGHTING", "WARDROBE", "SCENE"].includes(String(action.action)))
+        setAutoRevision(v.latest?.revision ?? null);
       setVersion(null);
       setDirty(false);
       setNotesDirty(false);
@@ -126,6 +130,11 @@ export function StylingStudio({
         {mode === "lighting"
           ? "Original schematics and unmetered starting settings. Verify on location."
           : "Three considered looks per person. Review your photo’s visible proportions and colors, or start with personal preferences. You make the final choice."}
+      </p>
+      <p className="hint">
+        New recommendations request original images when OpenAI image generation
+        is configured. Images are reviewed before publication; provider usage
+        applies. Technical SVG lighting diagrams remain exact editable layouts.
       </p>
       {mode === "wardrobe" && (
         <section className="panel">
@@ -251,6 +260,17 @@ export function StylingStudio({
                 >
                   {lighting ? "Regenerate lighting" : "Generate lighting"}
                 </button>
+                {lighting && (
+                  <GeneratedVisual
+                    key={`lighting:${current!.revision}`}
+                    shootId={shootId}
+                    target={{
+                      kind: "LIGHTING",
+                      stylingRevision: current!.revision,
+                    }}
+                    autoGenerate={autoRevision === current!.revision}
+                  />
+                )}
                 {!lighting && (
                   <p>
                     No lighting saved. Choose a recipe to create original top
@@ -450,6 +470,11 @@ export function StylingStudio({
                 {wardrobe && (
                   <>
                     <h2>Coordinated palette</h2>
+                    {wardrobe.provider && (
+                      <p className="hint">
+                        Wardrobe advice: {wardrobe.provider}
+                      </p>
+                    )}
                     {wardrobe.knowledgeOnly && (
                       <p className="quality-note">
                         Knowledge-only output: no photo observations used.
@@ -522,7 +547,19 @@ export function StylingStudio({
                           {look.candidates.map((c) => (
                             <article className="card" key={c.id}>
                               <h3>{c.name}</h3>
-                              <OutfitVisual colors={c.color} label={c.name} />
+                              <GeneratedVisual
+                                key={`${current!.revision}:${look.subjectId}:${c.id}`}
+                                shootId={shootId}
+                                target={{
+                                  kind: "WARDROBE",
+                                  stylingRevision: current!.revision,
+                                  subjectId: look.subjectId,
+                                  candidateId: c.id,
+                                }}
+                                autoGenerate={
+                                  autoRevision === current!.revision
+                                }
+                              />
                               <p>
                                 {c.color} ·{" "}
                                 {look.selectedId === c.id

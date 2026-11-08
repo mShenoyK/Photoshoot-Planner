@@ -94,7 +94,7 @@ export function ReferencePanel({
           ? "Local mock: example observations only. No body-shape or color detection is performed."
           : configured
             ? "OpenAI vision: only the private, metadata-stripped copy is sent after you request analysis and grant permission."
-            : "Photo analysis needs an OpenAI API key in the server settings. Manual profiles and styling preferences still work."}{" "}
+            : "Photo analysis needs AI_VISION_PROVIDER=openai and OPENAI_API_KEY in server settings. Manual profiles and styling preferences still work."}{" "}
         Observations can be affected by clothing, cropping, perspective and
         color casts. No personality, identity or precise measurements are
         inferred.

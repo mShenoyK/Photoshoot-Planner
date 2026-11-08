@@ -11,7 +11,8 @@
     "./styling": "./src/styling.ts",
     "./lighting-svg": "./src/lighting-svg.ts",
     "./artifacts": "./src/artifacts.ts",
-    "./references": "./src/references.ts"
+    "./references": "./src/references.ts",
+    "./visuals": "./src/visuals.ts"
   },
   "dependencies": {
     "zod": "^3.25.76"

@@ -1,12 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   mediaKinds,
+  requiresGuardian,
   referenceViews,
   type ReferenceScope,
   type Subject,
   type MediaAsset,
 } from "@framecraft/shared/inputs";
+import { ConsentForm } from "./consent-form";
 import { api, human } from "./client";
 export type PublicMedia = Omit<
   MediaAsset,
@@ -35,12 +37,37 @@ export function PhotoIntake({
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [complete, setComplete] = useState<string>();
+  useEffect(() => {
+    setIds((current) =>
+      current.filter((id) => subjects.some((s) => s.id === id)),
+    );
+  }, [subjects]);
   const allowed =
     ids.every(
       (id) => subjects.find((s) => s.id === id)?.consent?.status === "GRANTED",
     ) &&
     (ids.length > 0 || (kind !== "SUBJECT_PHOTO" && noPeople));
+  const blockers =
+    !ids.length && !noPeople
+      ? [
+          "Select every identifiable person below, or confirm that the reference contains no identifiable people.",
+        ]
+      : ids.flatMap((id) => {
+          const subject = subjects.find((s) => s.id === id);
+          return !subject || subject.consent?.status !== "GRANTED"
+            ? [
+                `Record photo consent for ${subject?.label || "the selected person"}${subject && requiresGuardian(subject) ? " with their guardian" : ""}.`,
+              ]
+            : [];
+        });
   async function upload() {
+    if (!complete && !allowed) {
+      setError(
+        blockers.join(" ") ||
+          "Review the people and consent declarations before upload.",
+      );
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -98,9 +125,11 @@ export function PhotoIntake({
         reliably judge blur, occlusion or color casts.
       </p>
       <p className="quality-note">
-        For photo-led styling and planning, enable photo-analysis permission in
-        each person’s consent before uploading. Changing consent removes linked
-        photos; you may need to upload them again.
+        For photo-led recommendations, enable photo analysis before uploading.
+        To guide generated images with those observations, also enable
+        image-generation permission for every person. Changing consent replaces
+        the previous permission and removes linked photos; record the intended
+        purposes first.
       </p>
       {scope && (
         <p className="quality-note">
@@ -140,7 +169,10 @@ export function PhotoIntake({
           id="photo-kind"
           disabled={busy || !!complete}
           value={kind}
-          onChange={(e) => setKind(e.target.value as typeof kind)}
+          onChange={(e) => {
+            setKind(e.target.value as typeof kind);
+            if (e.target.value === "SUBJECT_PHOTO") setNoPeople(false);
+          }}
         >
           {mediaKinds.map((v) => (
             <option key={v} value={v}>
@@ -175,18 +207,41 @@ export function PhotoIntake({
             Add subject profiles and record consent before uploading people.
           </p>
         )}
-        {kind !== "SUBJECT_PHOTO" && (
+        {
           <label className="check">
             <input
               type="checkbox"
               checked={noPeople}
               disabled={ids.length > 0}
-              onChange={(e) => setNoPeople(e.target.checked)}
+              onChange={(e) => {
+                setNoPeople(e.target.checked);
+                if (e.target.checked && kind === "SUBJECT_PHOTO")
+                  setKind(
+                    scope === "LIGHTING"
+                      ? "SCENE_REFERENCE"
+                      : scope === "WARDROBE"
+                        ? "WARDROBE_REFERENCE"
+                        : "POSE_REFERENCE",
+                  );
+              }}
             />{" "}
             I confirm this reference contains no identifiable people.
           </label>
-        )}
+        }
       </fieldset>
+      {ids
+        .map((id) => subjects.find((s) => s.id === id))
+        .filter((s): s is Subject => !!s)
+        .map((subject) => (
+          <div className="intake-permission" key={subject.id}>
+            <h3>Permission for {subject.label}</h3>
+            <ConsentForm
+              shootId={shootId}
+              subject={subject}
+              onChanged={onChanged}
+            />
+          </div>
+        ))}
       <div className="field">
         <label htmlFor="photo-file">
           Choose image (JPG, PNG or WebP; default limit 15 MB)
@@ -204,9 +259,9 @@ export function PhotoIntake({
       </div>
       {!allowed && (
         <p className="hint">
-          Photo intake stays blocked until every declared person has valid
-          consent, or a reference is confirmed to contain no identifiable
-          people.
+          {blockers.join(" ")} Select a file, then choose Upload privately to
+          review any missing steps. No image is processed until permission is
+          valid.
         </p>
       )}
       {error && (
@@ -216,7 +271,7 @@ export function PhotoIntake({
       )}
       {status && <p role="status">{status}</p>}
       <button
-        disabled={busy || (!complete && (!file || !allowed))}
+        disabled={busy || (!complete && !file)}
         onClick={() => void upload()}
       >
         {busy ? "Working…" : complete ? "Retry completion" : "Upload privately"}

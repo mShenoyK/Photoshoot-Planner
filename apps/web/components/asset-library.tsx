@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import type { PublicVisual } from "@framecraft/shared/visuals";
 import type { ShootPlan } from "@framecraft/shared/planning";
 import type { Styling } from "@framecraft/shared/styling";
 import type { Artifact } from "@framecraft/shared/artifacts";
@@ -14,6 +15,8 @@ export function AssetLibrary({
   shootId: string;
   standalone?: boolean;
 }) {
+  const [visuals, setVisuals] = useState<PublicVisual[]>([]);
+  const [imageMode, setImageMode] = useState("openai");
   const [plans, setPlans] = useState<ShootPlan[] | null>(null);
   const [styling, setStyling] = useState<Styling[]>([]);
   const [artifacts, setArtifacts] = useState<Omit<Artifact, "storageKey">[]>(
@@ -27,14 +30,19 @@ export function AssetLibrary({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const load = async () => {
-    const [p, s, a] = await Promise.all([
+    const [p, s, a, v] = await Promise.all([
       api<ShootPlan[]>(`shoots/${shootId}/plans`),
       api<{ versions: Styling[] }>(`shoots/${shootId}/styling`),
       api<Omit<Artifact, "storageKey">[]>(`shoots/${shootId}/artifacts`),
+      api<{ items: PublicVisual[]; provider: { mode: string } }>(
+        `shoots/${shootId}/visuals`,
+      ),
     ]);
     setPlans(p);
     setStyling(s.versions);
     setArtifacts(a);
+    setVisuals(v.items);
+    setImageMode(v.provider.mode);
     return p;
   };
   async function receiveJob(next: TaskJob) {
@@ -89,6 +97,15 @@ export function AssetLibrary({
     setError("");
     setBusy(true);
     try {
+      if (illustration && imageMode !== "mock") {
+        await receiveJob(
+          await api<TaskJob>(`shoots/${shootId}/visuals`, "POST", {
+            target: { kind: "POSE", planId, poseId },
+            idempotencyKey: crypto.randomUUID(),
+          }),
+        );
+        return;
+      }
       await receiveJob(
         await api<TaskJob>(`shoots/${shootId}/artifacts`, "POST", {
           planId,
@@ -194,11 +211,16 @@ export function AssetLibrary({
               </select>
             </label>
             <button onClick={() => create()}>Create export</button>
-            <h2>Original pose schematic</h2>
+            <h2>
+              {imageMode === "mock"
+                ? "Original pose schematic (local test mode)"
+                : "Original generated pose image"}
+            </h2>
             <p>
-              Original support-and-spacing figures, not photographic likenesses
-              or a precise limb simulation. Baby/toddler scenes require an adult
-              caregiver profile. Generated only when requested.
+              {imageMode === "mock"
+                ? "Local test-only support-and-spacing schematic; not a live image."
+                : "Request a new original OpenAI image from the saved pose. The image is reviewed for subject count, age and safety before publication."}{" "}
+              Baby/toddler pose images require an adult caregiver profile.
             </p>
             <label>
               Pose to illustrate
@@ -216,7 +238,9 @@ export function AssetLibrary({
               </select>
             </label>
             <button onClick={() => create(true)}>
-              Generate original schematic
+              {imageMode === "mock"
+                ? "Generate original schematic"
+                : "Generate original image"}
             </button>
           </fieldset>
         ))}
@@ -242,6 +266,34 @@ export function AssetLibrary({
         >
           Retry artifact job
         </button>
+      )}
+      {!!visuals.length && (
+        <section className="panel">
+          <h2>Generated recommendation images</h2>
+          <div className="reference-grid">
+            {visuals.map((v) => (
+              <figure key={v.id}>
+                <Image
+                  unoptimized
+                  width={1024}
+                  height={1024}
+                  src={`/api/v1/shoots/${shootId}/visuals/${v.id}/download`}
+                  alt={`AI-generated ${v.target.kind.toLowerCase()} proposal`}
+                  style={{ width: "100%", height: "auto" }}
+                />
+                <figcaption>
+                  {v.provider} ·{" "}
+                  <a
+                    href={`/api/v1/shoots/${shootId}/visuals/${v.id}/download`}
+                    download
+                  >
+                    Download PNG
+                  </a>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
       )}
       <h2>Saved artifacts</h2>
       {!artifacts.length ? (

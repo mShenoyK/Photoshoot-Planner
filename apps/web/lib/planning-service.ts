@@ -25,7 +25,7 @@ import {
 } from "./knowledge-service";
 import type { InputState, Subject } from "@framecraft/shared/inputs";
 import type { Shoot } from "@framecraft/shared";
-function snapshot(shoot: Shoot, state: InputState) {
+export function planInputHash(shoot: Shoot, state: InputState) {
   const subjects = state.subjects.map(({ consent, consentHistory, ...s }) => {
     void consent;
     void consentHistory;
@@ -186,7 +186,7 @@ async function plannerInput(
         referenceKind: state.media.find((a) => a.id === r.assetId)?.kind,
       })),
       poseCount,
-      inputHash: snapshot(shoot, state),
+      inputHash: planInputHash(shoot, state),
       genericFallback,
     };
   });
@@ -250,7 +250,7 @@ export async function generatePlan(
                 503,
               ),
             ),
-          30000,
+          60000,
         );
         timer.unref();
       }),
@@ -278,7 +278,7 @@ export async function generatePlan(
         "Source provenance changed before save.",
       );
     return await withShoot(owner, shootId, (state, shoot) => {
-      if (snapshot(shoot, state) !== input.inputHash)
+      if (planInputHash(shoot, state) !== input.inputHash)
         throw new InputError(
           "INPUT_CHANGED",
           "The brief or profiles changed during generation. Retry.",

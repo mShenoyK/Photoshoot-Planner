@@ -67,15 +67,29 @@ export function approvedReferences(
     }
   });
 }
+function visionConfiguration() {
+  const mode =
+    process.env.AI_VISION_PROVIDER ??
+    (process.env.DATA_MODE === "mock" && process.env.NODE_ENV !== "production"
+      ? "mock"
+      : "openai");
+  const blocked = process.env.NODE_ENV === "production" && mode === "mock";
+  return {
+    provider: blocked ? "disabled" : mode,
+    configured:
+      !blocked &&
+      (mode === "mock" ||
+        (mode === "openai" &&
+          !!(
+            (process.env.OPENAI_API_KEY || process.env.AI_API_KEY) &&
+            (process.env.OPENAI_API_KEY || process.env.AI_API_KEY) !==
+              "replace_me"
+          ))),
+  };
+}
 export const readReferences = (owner: string, id: string) =>
   withShoot(owner, id, (s) => ({
-    provider: process.env.AI_VISION_PROVIDER ?? "mock",
-    configured:
-      (process.env.AI_VISION_PROVIDER ?? "mock") === "mock" ||
-      !!(
-        (process.env.OPENAI_API_KEY || process.env.AI_API_KEY) &&
-        (process.env.OPENAI_API_KEY || process.env.AI_API_KEY) !== "replace_me"
-      ),
+    ...visionConfiguration(),
     reviews: (s.referenceReviews ?? [])
       .filter((r) => {
         const a = s.media.find((a) => a.id === r.assetId);

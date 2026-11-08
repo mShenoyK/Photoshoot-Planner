@@ -1,5 +1,5 @@
 "use client";
-import { OutfitVisual } from "./outfit-visual";
+import { GeneratedVisual } from "./generated-visual";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Styling } from "@framecraft/shared/styling";
@@ -29,10 +29,12 @@ export function CompletePlanPanel({
   shootId,
   planId,
   refresh,
+  autoGenerate = false,
 }: {
   shootId: string;
   planId?: string;
   refresh: number;
+  autoGenerate?: boolean;
 }) {
   const [data, setData] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
@@ -101,6 +103,14 @@ export function CompletePlanPanel({
         <>
           <h2>Lighting setup</h2>
           <p>{lighting.title}</p>
+          <GeneratedVisual
+            shootId={shootId}
+            target={{
+              kind: "LIGHTING",
+              stylingRevision: data.record!.stylingRevision,
+            }}
+            autoGenerate={autoGenerate}
+          />
           <div className="complete-visual-grid">
             {(["top", "side"] as const).map((view) => (
               <figure key={view}>
@@ -143,7 +153,17 @@ export function CompletePlanPanel({
                 <h3>{look.label}</h3>
                 {look.candidates.map((outfit) => (
                   <div className="outfit-reference" key={outfit.id}>
-                    <OutfitVisual colors={outfit.color} label={outfit.name} />
+                    <GeneratedVisual
+                      key={`${data.record!.stylingRevision}:${look.subjectId}:${outfit.id}`}
+                      shootId={shootId}
+                      target={{
+                        kind: "WARDROBE",
+                        stylingRevision: data.record!.stylingRevision,
+                        subjectId: look.subjectId,
+                        candidateId: outfit.id,
+                      }}
+                      autoGenerate={autoGenerate}
+                    />
                     <div>
                       <h4>
                         {outfit.name}
@@ -162,8 +182,8 @@ export function CompletePlanPanel({
             ))}
           </div>
           <p className="hint">
-            Original color and garment moodboards. Approximate silhouettes; not
-            a fit prediction or a depiction of the subject.
+            Original generated proposals use fictional people and are not
+            predictions of fit or depictions of the subject.
           </p>
           <Link href={`/shoots/${shootId}/wardrobe`}>
             Coordinate, lock or swap outfits in Wardrobe Stylist

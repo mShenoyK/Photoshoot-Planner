@@ -48,8 +48,12 @@ for (const width of [375, 1440])
       page.getByRole("heading", { name: "Lighting setup", exact: true }),
     ).toBeVisible();
     await expect(page.locator(".complete-diagram svg")).toHaveCount(2);
-    await expect(page.locator(".outfit-visual")).toHaveCount(3);
-    await expect(page.locator("[data-pose-subject]")).toHaveCount(6);
+    await expect(
+      page.locator(".outfit-reference .recommendation-visual"),
+    ).toHaveCount(3);
+    await expect(page.locator(".pose-card .recommendation-visual")).toHaveCount(
+      6,
+    );
     await expect(
       page.getByText(/This bundle used 0 reviewed references/),
     ).toBeVisible();

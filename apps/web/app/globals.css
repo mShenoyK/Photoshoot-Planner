@@ -1188,3 +1188,19 @@ header nav a {
     gap: 10px;
   }
 }
+
+.recommendation-visual {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  min-width: 0;
+  width: 100%;
+}
+.recommendation-visual p,
+.recommendation-visual figcaption {
+  overflow-wrap: anywhere;
+}
+.outfit-reference {
+  flex-direction: column;
+}

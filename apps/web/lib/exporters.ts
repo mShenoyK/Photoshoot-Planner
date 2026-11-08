@@ -12,6 +12,12 @@ export type ExportInput = {
   styling?: Styling;
   title: string;
   createdAt: string;
+  generatedImages?: {
+    fileName: string;
+    provider: string;
+    target: unknown;
+    review: unknown;
+  }[];
   illustrations?: { fileName: string; bytes: Uint8Array; sha256: string }[];
 };
 const md = (s: string) =>
@@ -271,6 +277,7 @@ export async function exportBytes(
     stylingRevision: input.styling?.revision ?? null,
     provider: input.plan.provider,
     sourceReferences: refs,
+    generatedImages: input.generatedImages ?? [],
     lightingProvenance: input.styling?.lighting?.provenance ?? null,
     wardrobeProvenance: input.styling?.wardrobe?.provenance ?? null,
     exclusions: [

@@ -170,7 +170,9 @@ for (const width of [375, 1440])
             exact: true,
           })
           .click();
-        await expect(page.locator("[data-pose-subject]")).toHaveCount(6);
+        await expect(
+          page.locator(".pose-card .recommendation-visual"),
+        ).toHaveCount(6);
         const plans = (
           await (
             await page.request.get(`/api/v1/shoots/${workflow.id}/plans`)

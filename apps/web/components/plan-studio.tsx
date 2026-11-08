@@ -2,12 +2,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CompletePlanPanel } from "./complete-plan-panel";
-import { PoseSchematic } from "./pose-schematic";
+import { GeneratedVisual } from "./generated-visual";
 import { ShootNav } from "./shoot-nav";
 import { ReferencePanel } from "./reference-panel";
 import type { ShootPlan } from "@framecraft/shared/planning";
 import type { TaskJob } from "@framecraft/shared/knowledge";
-import { api, human } from "./client";
+import { api, human, providerFailure } from "./client";
 type Plan = ShootPlan & { citationStatus: "VALID" | "SOURCE_UNAVAILABLE" };
 export function PlanStudio({
   shootId,
@@ -23,19 +23,22 @@ export function PlanStudio({
   const [job, setJob] = useState<TaskJob | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [autoPlanId, setAutoPlanId] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [useKnowledge, setKnowledge] = useState(true);
   const [query, setQuery] = useState("");
   const [dirty, setDirty] = useState<Set<string>>(new Set());
-  const load = async () => {
+  const load = async (images = false) => {
     const data = await api<Plan[]>(`shoots/${shootId}/plans`);
     setPlans(data);
+    if (images) setAutoPlanId(data.at(-1)?.id ?? "");
     setRefresh((v) => v + 1);
     setDraft(data.at(-1) ?? null);
     setDirty(new Set());
   };
   async function receiveJob(next: TaskJob) {
-    if (next.status === "SUCCEEDED") await load();
+    if (next.status === "SUCCEEDED")
+      await load(next.kind === "PLAN" || next.kind === "REGENERATE");
     setJob(next);
   }
   useEffect(() => {
@@ -51,12 +54,11 @@ export function PlanStudio({
       api<TaskJob>("jobs/" + job.id)
         .then(async (next) => {
           if (!active) return;
-          if (next.status === "SUCCEEDED") await load();
+          if (next.status === "SUCCEEDED")
+            await load(next.kind === "PLAN" || next.kind === "REGENERATE");
           setJob(next);
           if (next.status === "FAILED")
-            setError(
-              `Generation failed: ${next.errorCode}. Your saved versions are retained.`,
-            );
+            setError(providerFailure(next.errorCode));
         })
         .catch((e) => {
           if (active) setError(e.message);
@@ -221,6 +223,12 @@ export function PlanStudio({
             recommendations are labeled generated guidance. Source principles
             use only approved, rights-permitted private knowledge.
           </p>
+          <p className="hint">
+            Generating a new guide also requests original images for its pose
+            cards when OpenAI image generation is configured. Provider usage
+            applies. Existing saved images are reused when guidance is
+            unchanged.
+          </p>
           <label className="check">
             <input
               type="checkbox"
@@ -273,10 +281,7 @@ export function PlanStudio({
             {job.attempts}/3
           </p>
           {job.status === "FAILED" && (
-            <p role="alert">
-              {job.errorCode}: generation failed; your saved versions are
-              retained.
-            </p>
+            <p role="alert">{providerFailure(job.errorCode)}</p>
           )}
           {(job.status === "FAILED" ||
             (job.status === "QUEUED" &&
@@ -303,6 +308,7 @@ export function PlanStudio({
           shootId={shootId}
           planId={draft?.id}
           refresh={refresh}
+          autoGenerate={autoPlanId === draft?.id}
         />
       )}
       {plans === null ? (
@@ -519,14 +525,15 @@ export function PlanStudio({
                     .toLowerCase()
                     .includes(query.toLowerCase()),
                 )
-                .map((p, poseIndex) => (
+                .map((p) => (
                   <article className="media-row pose-card" key={p.id}>
                     <span className="badge">{human(p.guidanceKind)}</span>
                     <h3>{p.title}</h3>
-                    <PoseSchematic
-                      ids={p.subjectIds}
-                      title={p.title}
-                      index={poseIndex}
+                    <GeneratedVisual
+                      key={`${draft.id}:${p.id}`}
+                      shootId={shootId}
+                      target={{ kind: "POSE", planId: draft.id, poseId: p.id }}
+                      autoGenerate={autoPlanId === draft.id && !dirty.size}
                     />
                     <h4>How to direct this pose</h4>
                     <ol>
@@ -534,29 +541,7 @@ export function PlanStudio({
                         <li key={i}>{step}</li>
                       ))}
                     </ol>
-                    <button
-                      className="secondary"
-                      disabled={busy || jobActive || !!dirty.size}
-                      onClick={() =>
-                        void action(
-                          async () =>
-                            await receiveJob(
-                              await api<TaskJob>(
-                                `shoots/${shootId}/artifacts`,
-                                "POST",
-                                {
-                                  planId: draft.id,
-                                  format: "ILLUSTRATION",
-                                  poseId: p.id,
-                                  idempotencyKey: crypto.randomUUID(),
-                                },
-                              ),
-                            ),
-                        )
-                      }
-                    >
-                      Illustrate this pose
-                    </button>
+
                     <p>{p.subjectArrangement}</p>
                     <div className="field">
                       <label htmlFor={"pose-title-" + p.id}>Pose title</label>
@@ -637,9 +622,9 @@ export function PlanStudio({
                       </p>
                     )}
                     <p className="hint">
-                      Generate a private original schematic on demand, or follow
-                      the face-spacing guide above. Original book illustrations
-                      are never displayed here.
+                      Original images are created from this saved guide and
+                      reviewed before publication. No source-book illustrations
+                      are copied.
                     </p>
                   </article>
                 ))}

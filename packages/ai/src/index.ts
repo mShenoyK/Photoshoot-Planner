@@ -1,3 +1,5 @@
+import { OpenAIPlanner } from "./openai-planner";
+import { liveProviderMode } from "./openai-http";
 import type { Shoot } from "@framecraft/shared";
 import type { Subject, InputState } from "@framecraft/shared/inputs";
 import { planSchema, type ShootPlan } from "@framecraft/shared/planning";
@@ -232,9 +234,10 @@ export class MockIllustrator implements ImageIllustrator {
   }
 }
 export function textPlanner(): TextPlanner {
-  if ((process.env.AI_TEXT_PROVIDER ?? "mock") !== "mock")
-    throw new Error("TEXT_PROVIDER_NOT_CONFIGURED");
-  return new MockPlanner();
+  const mode = liveProviderMode("AI_TEXT_PROVIDER");
+  if (mode === "openai") return new OpenAIPlanner();
+  if (mode === "mock") return new MockPlanner();
+  throw new Error("TEXT_PROVIDER_NOT_CONFIGURED");
 }
 
 export class MockEmbeddingProvider implements EmbeddingProvider {
@@ -260,3 +263,16 @@ export {
   OpenAIReferenceVision,
 } from "./reference-vision";
 export type { ReferenceVisionProvider } from "./reference-vision";
+
+export { OpenAIPlanner } from "./openai-planner";
+export {
+  OpenAIRecommendationImages,
+  recommendationImages,
+  imageProviderStatus,
+} from "./recommendation-images";
+export type {
+  RecommendationImageInput,
+  RecommendationImageProvider,
+} from "./recommendation-images";
+
+export { OpenAIWardrobeStylist, refineWardrobe } from "./wardrobe-stylist";

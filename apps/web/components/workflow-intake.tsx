@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import type { Subject, ReferenceScope } from "@framecraft/shared/inputs";
 import { PhotoIntake, type PublicMedia } from "./photo-intake";
 import { SubjectForm } from "./subject-form";
-import { ConsentForm } from "./consent-form";
 import { api } from "./client";
 export function WorkflowIntake({
   shootId,
@@ -62,16 +61,6 @@ export function WorkflowIntake({
               onCancel={() => setAdding(false)}
             />
           )}
-          {data.subjects.map((subject) => (
-            <details key={subject.id}>
-              <summary>Consent for {subject.label}</summary>
-              <ConsentForm
-                shootId={shootId}
-                subject={subject}
-                onChanged={() => void load()}
-              />
-            </details>
-          ))}
           <PhotoIntake
             shootId={shootId}
             scope={scope}

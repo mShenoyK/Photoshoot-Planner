@@ -19,9 +19,9 @@ services:
       - key: QUEUE_DRIVER
         value: bullmq
       - key: AI_TEXT_PROVIDER
-        value: mock
+        value: openai
       - key: AI_IMAGE_PROVIDER
-        value: mock
+        value: openai
       - key: AI_EMBEDDINGS_PROVIDER
         value: mock
       - key: ENABLE_EMBEDDINGS
@@ -39,4 +39,8 @@ services:
       - key: STORAGE_ACCESS_KEY_ID
         sync: false
       - key: STORAGE_SECRET_ACCESS_KEY
+        sync: false
+      - key: AI_VISION_PROVIDER
+        value: openai
+      - key: OPENAI_API_KEY
         sync: false

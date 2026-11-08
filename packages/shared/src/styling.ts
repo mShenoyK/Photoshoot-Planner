@@ -121,6 +121,7 @@ export const lookSchema = z
   .strict();
 export const wardrobeSchema = z
   .object({
+    provider: z.string().max(100).optional(),
     palette: z.array(z.string().max(300)).min(1).max(20),
     heroSubjectId: z.string().uuid().optional(),
     looks: z.array(lookSchema).max(20),
@@ -191,3 +192,18 @@ export type Lighting = z.infer<typeof lightingSchema>;
 export type Wardrobe = z.infer<typeof wardrobeSchema>;
 export type Styling = z.infer<typeof stylingSchema>;
 export type StylingAction = z.infer<typeof stylingActionSchema>;
+
+export const wardrobeRefinementSchema = z
+  .object({
+    looks: z
+      .array(
+        z
+          .object({
+            subjectId: z.string().uuid(),
+            candidates: z.array(outfitSchema.omit({ color: true })).length(3),
+          })
+          .strict(),
+      )
+      .max(20),
+  })
+  .strict();

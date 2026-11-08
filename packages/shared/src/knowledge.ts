@@ -140,7 +140,14 @@ export type TaskJob = {
   id: string;
   ownerId: string;
   shootId?: string;
-  kind: "INGEST" | "EMBED" | "PLAN" | "REGENERATE" | "ILLUSTRATE" | "EXPORT";
+  kind:
+    | "INGEST"
+    | "EMBED"
+    | "PLAN"
+    | "REGENERATE"
+    | "ILLUSTRATE"
+    | "EXPORT"
+    | "VISUAL";
   status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
   progress: number;
   attempts: number;
